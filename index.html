@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>My Phone App</title>
+  <style>
+    body { font-family: -apple-system, system-ui; margin: 16px; }
+    .card { padding: 12px; border: 1px solid #ddd; border-radius: 12px; margin: 12px 0; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff; }
+    input { padding: 10px; border-radius: 10px; border: 1px solid #ccc; width: 100%; }
+    small { color: #666; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <h2>My Phone App</h2>
+
+  <div class="card">
+    <div><b>Config URL</b></div>
+    <input id="configUrl" placeholder="Paste your config.json URL here" />
+    <small>Saved on this device only.</small>
+    <div style="height:10px"></div>
+    <button onclick="saveUrl()">Save URL</button>
+    <button onclick="loadConfig()">Load Config</button>
+  </div>
+
+  <div class="card">
+    <div><b>Latest Config</b></div>
+    <pre id="out">(nothing loaded yet)</pre>
+  </div>
+
+  <script>
+    const KEY = "my_app_config_url";
+
+    function saveUrl() {
+      const url = document.getElementById("configUrl").value.trim();
+      localStorage.setItem(KEY, url);
+      alert("Saved!");
+    }
+
+    async function loadConfig() {
+      const url = localStorage.getItem(KEY);
+      if (!url) {
+        alert("Save a config URL first.");
+        return;
+      }
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        document.getElementById("out").textContent = JSON.stringify(json, null, 2);
+      } catch (e) {
+        document.getElementById("out").textContent = "Error loading config: " + e;
+      }
+    }
+
+    // load saved url into the input on startup
+    const saved = localStorage.getItem(KEY);
+    if (saved) document.getElementById("configUrl").value = saved;
+  </script>
+</body>
+</html>
