@@ -592,10 +592,17 @@
 
       // Today page
       document.getElementById('mood-input').addEventListener('input', (e) => {
-        const value = e.target.value;
+        const value = parseInt(e.target.value) || 5;
         document.getElementById('mood-value').textContent = value;
         updateMoodBar('mood-bar', 'mood-bar-fill', value);
         debounceSave();
+      });
+      
+      // Also update on change event
+      document.getElementById('mood-input').addEventListener('change', (e) => {
+        const value = parseInt(e.target.value) || 5;
+        document.getElementById('mood-value').textContent = value;
+        updateMoodBar('mood-bar', 'mood-bar-fill', value);
       });
       document.getElementById('highlight-input').addEventListener('input', debounceSave);
       document.getElementById('screen-time-input').addEventListener('input', debounceSave);
@@ -1115,11 +1122,22 @@
       }
 
       emptyState.style.display = 'none';
+      
+      // Apply ordering from preferences
+      const prefs = await getPreferences();
+      if (prefs.habitOrder && prefs.habitOrder.length > 0) {
+        const orderMap = new Map(prefs.habitOrder.map((id, idx) => [id, idx]));
+        habits = habits.sort((a, b) => {
+          const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 999;
+          const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 999;
+          return aIdx - bIdx;
+        });
+      }
+      
       container.innerHTML = habits.map((habit, index) => `
-        <div class="habit-item draggable" data-habit-id="${habit.id}" data-index="${index}">
-          <div class="drag-controls">
-            <button class="drag-up-btn" data-habit-id="${habit.id}" ${index === 0 ? 'disabled' : ''} title="Move up">↑</button>
-            <button class="drag-down-btn" data-habit-id="${habit.id}" ${index === habits.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+        <div class="habit-item" data-habit-id="${habit.id}" data-index="${index}">
+          <div class="habit-order-controls">
+            <input type="number" class="habit-order-input" data-habit-id="${habit.id}" value="${index + 1}" min="1" max="${habits.length}" />
           </div>
           <span class="habit-name">${escapeHtml(habit.name)}</span>
           <div class="habit-actions">
@@ -1129,18 +1147,12 @@
         </div>
       `).join('');
 
-      // Add up/down buttons for reordering
-      container.querySelectorAll('.drag-up-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const habitId = parseInt(btn.dataset.habitId);
-          await moveHabitUp(habitId);
-        });
-      });
-      
-      container.querySelectorAll('.drag-down-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const habitId = parseInt(btn.dataset.habitId);
-          await moveHabitDown(habitId);
+      // Add order input listeners
+      container.querySelectorAll('.habit-order-input').forEach(input => {
+        input.addEventListener('change', async (e) => {
+          const habitId = parseInt(e.target.dataset.habitId);
+          const newPosition = parseInt(e.target.value) - 1;
+          await reorderHabit(habitId, newPosition);
         });
       });
 
@@ -1176,40 +1188,20 @@
       });
     }
 
-    async function moveHabitUp(habitId) {
+    async function reorderHabit(habitId, newPosition) {
       const habits = await getHabits();
       const prefs = await getPreferences();
-      const order = prefs.habitOrder || habits.map(h => h.id);
+      let order = prefs.habitOrder || habits.map(h => h.id);
       
+      // Remove habit from current position
       const currentIndex = order.indexOf(habitId);
-      if (currentIndex <= 0) return;
+      if (currentIndex === -1) return;
       
-      // Swap with previous
-      [order[currentIndex - 1], order[currentIndex]] = [order[currentIndex], order[currentIndex - 1]];
+      order.splice(currentIndex, 1);
       
-      await setPreference('habitOrder', order);
-      await renderHabitsList();
-      
-      // Reload history if visible
-      if (document.getElementById('history-tab').classList.contains('active')) {
-        await loadHistoryPage();
-      }
-      // Reload today if visible
-      if (document.getElementById('today-tab').classList.contains('active')) {
-        await loadTodayPage();
-      }
-    }
-
-    async function moveHabitDown(habitId) {
-      const habits = await getHabits();
-      const prefs = await getPreferences();
-      const order = prefs.habitOrder || habits.map(h => h.id);
-      
-      const currentIndex = order.indexOf(habitId);
-      if (currentIndex >= order.length - 1) return;
-      
-      // Swap with next
-      [order[currentIndex], order[currentIndex + 1]] = [order[currentIndex + 1], order[currentIndex]];
+      // Insert at new position
+      const clampedPosition = Math.max(0, Math.min(newPosition, order.length));
+      order.splice(clampedPosition, 0, habitId);
       
       await setPreference('habitOrder', order);
       await renderHabitsList();
@@ -1403,10 +1395,25 @@
           datasets: [{
             label: 'Mood',
             data: moodData.map(d => d.mood),
-            borderColor: '#007AFF',
-            backgroundColor: 'rgba(0, 122, 255, 0.1)',
+            borderColor: (ctx) => {
+              const value = moodData[ctx.dataIndex]?.mood || 5;
+              const hue = ((value - 1) / 9) * 120;
+              return `hsl(${hue}, 70%, 50%)`;
+            },
+            backgroundColor: (ctx) => {
+              const value = moodData[ctx.dataIndex]?.mood || 5;
+              const hue = ((value - 1) / 9) * 120;
+              return `hsla(${hue}, 70%, 50%, 0.2)`;
+            },
             tension: 0.4,
-            fill: true
+            fill: true,
+            segment: {
+              borderColor: (ctx) => {
+                const value = moodData[ctx.p1DataIndex]?.mood || 5;
+                const hue = ((value - 1) / 9) * 120;
+                return `hsl(${hue}, 70%, 50%)`;
+              }
+            }
           }]
         },
         options: {
@@ -1544,7 +1551,17 @@
       
       // Load top habits (first 3 from ordered list)
       const habits = await getHabits();
-      const orderedHabits = habits.slice(0, 3);
+      const prefs = await getPreferences();
+      let orderedHabits = habits;
+      if (prefs.habitOrder && prefs.habitOrder.length > 0) {
+        const orderMap = new Map(prefs.habitOrder.map((id, idx) => [id, idx]));
+        orderedHabits = habits.sort((a, b) => {
+          const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 999;
+          const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 999;
+          return aIdx - bIdx;
+        });
+      }
+      orderedHabits = orderedHabits.slice(0, 3);
       topHabits = orderedHabits.map(h => h.id);
 
       // Update header with habit names
@@ -1563,8 +1580,10 @@
         return `
           <div class="history-row" data-date="${entry.date}">
             <div class="history-date-col">${formatDateShort(entry.date)}</div>
-            <div class="history-mood-col">${entry.mood ? `${entry.mood}/10` : '-'}</div>
-            <div class="history-habits-col">${habitBoxes}</div>
+            <div class="history-header-right">
+              <div class="history-mood-col">${entry.mood ? `${entry.mood}/10` : '-'}</div>
+              <div class="history-habits-col">${habitBoxes}</div>
+            </div>
           </div>
         `;
       }).join('');
@@ -1865,7 +1884,27 @@
       const startDayOfWeek = firstDay.getDay();
       
       // Create calendar grid
-      let calendarHtml = '<div class="calendar-grid">';
+      let calendarHtml = '';
+      
+      // Add styles for all mood levels (once at the start)
+      if (viewType === 'mood') {
+        for (let m = 1; m <= 10; m++) {
+          const hue = ((m - 1) / 9) * 120; // 0 (red) to 120 (green)
+          const saturation = 70;
+          const lightness = 50;
+          calendarHtml += `
+            <style>
+              .calendar-day.mood-${m} {
+                background-color: hsl(${hue}, ${saturation}%, ${lightness}%) !important;
+                border-color: hsl(${hue}, ${saturation}%, ${lightness}%) !important;
+                color: ${m <= 5 ? 'white' : '#000'} !important;
+              }
+            </style>
+          `;
+        }
+      }
+      
+      calendarHtml += '<div class="calendar-grid">';
       
       // Day headers
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1888,14 +1927,10 @@
         
         if (viewType === 'mood') {
           if (entry && entry.mood) {
-            if (entry.mood >= 7) {
-              colorClass = 'good';
-            } else if (entry.mood >= 4) {
-              colorClass = 'neutral';
-            } else {
-              colorClass = 'bad';
-            }
-            status = entry.mood;
+            // Create gradient from red (1) to green (10)
+            const mood = entry.mood;
+            colorClass = 'mood-' + mood;
+            status = mood;
           }
         } else if (viewType === 'journal') {
           if (entry && entry.journal && entry.journal.trim().length > 0) {
