@@ -240,48 +240,105 @@ async function importData(json) {
     throw new Error('Invalid import format');
   }
 
-  // Clear existing data
-  const habitsTransaction = db.transaction([STORE_HABITS], 'readwrite');
-  const habitsStore = habitsTransaction.objectStore(STORE_HABITS);
+  // Clear existing data - use separate transactions
   await new Promise((resolve, reject) => {
-    const clearRequest = habitsStore.clear();
-        clearRequest.onsuccess = () => resolve();
-        clearRequest.onerror = () => reject(clearRequest.error);
+    const transaction = db.transaction([STORE_HABITS], 'readwrite');
+    const store = transaction.objectStore(STORE_HABITS);
+    const clearRequest = store.clear();
+    clearRequest.onsuccess = () => resolve();
+    clearRequest.onerror = () => reject(clearRequest.error);
+    transaction.onerror = () => reject(transaction.error);
   });
 
-  const entriesTransaction = db.transaction([STORE_ENTRIES], 'readwrite');
-  const entriesStore = entriesTransaction.objectStore(STORE_ENTRIES);
   await new Promise((resolve, reject) => {
-    const clearRequest = entriesStore.clear();
-        clearRequest.onsuccess = () => resolve();
-        clearRequest.onerror = () => reject(clearRequest.error);
+    const transaction = db.transaction([STORE_ENTRIES], 'readwrite');
+    const store = transaction.objectStore(STORE_ENTRIES);
+    const clearRequest = store.clear();
+    clearRequest.onsuccess = () => resolve();
+    clearRequest.onerror = () => reject(clearRequest.error);
+    transaction.onerror = () => reject(transaction.error);
   });
 
-  const prefsTransaction = db.transaction([STORE_PREFERENCES], 'readwrite');
-  const prefsStore = prefsTransaction.objectStore(STORE_PREFERENCES);
   await new Promise((resolve, reject) => {
-    const clearRequest = prefsStore.clear();
-        clearRequest.onsuccess = () => resolve();
-        clearRequest.onerror = () => reject(clearRequest.error);
+    const transaction = db.transaction([STORE_PREFERENCES], 'readwrite');
+    const store = transaction.objectStore(STORE_PREFERENCES);
+    const clearRequest = store.clear();
+    clearRequest.onsuccess = () => resolve();
+    clearRequest.onerror = () => reject(clearRequest.error);
+    transaction.onerror = () => reject(transaction.error);
   });
 
-  // Import habits
-  for (const habit of json.habits) {
-    await new Promise((resolve, reject) => {
-      const request = habitsStore.add(habit);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
+  // Import habits - use a single transaction for all habits
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_HABITS], 'readwrite');
+    const store = transaction.objectStore(STORE_HABITS);
+    let completed = 0;
+    let hasError = false;
 
-  // Import entries
-  for (const entry of json.entries) {
-    await new Promise((resolve, reject) => {
-      const request = entriesStore.put(entry);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
+    if (json.habits.length === 0) {
+      resolve();
+      return;
+    }
+
+    for (const habit of json.habits) {
+      const request = store.add(habit);
+      request.onsuccess = () => {
+        completed++;
+        if (completed === json.habits.length && !hasError) {
+          resolve();
+        }
+      };
+      request.onerror = () => {
+        if (!hasError) {
+          hasError = true;
+          reject(request.error);
+        }
+      };
+    }
+
+    transaction.onerror = () => {
+      if (!hasError) {
+        hasError = true;
+        reject(transaction.error);
+      }
+    };
+  });
+
+  // Import entries - use a single transaction for all entries
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_ENTRIES], 'readwrite');
+    const store = transaction.objectStore(STORE_ENTRIES);
+    let completed = 0;
+    let hasError = false;
+
+    if (json.entries.length === 0) {
+      resolve();
+      return;
+    }
+
+    for (const entry of json.entries) {
+      const request = store.put(entry);
+      request.onsuccess = () => {
+        completed++;
+        if (completed === json.entries.length && !hasError) {
+          resolve();
+        }
+      };
+      request.onerror = () => {
+        if (!hasError) {
+          hasError = true;
+          reject(request.error);
+        }
+      };
+    }
+
+    transaction.onerror = () => {
+      if (!hasError) {
+        hasError = true;
+        reject(transaction.error);
+      }
+    };
+  });
 
   // Import preferences if available
   if (json.preferences) {
