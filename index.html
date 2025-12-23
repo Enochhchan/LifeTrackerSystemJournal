@@ -510,23 +510,29 @@
     // Track last known date to detect day changes
     let lastKnownDate = null;
     let dateCheckInterval = null;
+    let isCheckingDate = false; // Prevent recursive calls
 
     // Check if date has changed and update if needed
     async function checkDateChange() {
+      if (isCheckingDate) return false; // Prevent recursive calls
+      isCheckingDate = true;
+      
       const currentDate = getTodayDate();
       // Initialize if first check
       if (!lastKnownDate) {
         lastKnownDate = currentDate;
-        return;
+        isCheckingDate = false;
+        return false;
       }
       
       if (currentDate !== lastKnownDate) {
         // Day has changed
         console.log(`Date changed from ${lastKnownDate} to ${currentDate}`);
         lastKnownDate = currentDate;
-        // Reload today page if it's active
+        
+        // Reload today page if it's active (but don't call checkDateChange again)
         if (document.getElementById('today-tab').classList.contains('active')) {
-          await loadTodayPage();
+          await loadTodayPageWithoutDateCheck();
           await checkMoodPrompt();
         }
         // Reload history if it's active
@@ -538,7 +544,11 @@
         if (document.getElementById('stats-tab').classList.contains('active')) {
           await loadStatsPage();
         }
+        isCheckingDate = false;
+        return true;
       }
+      isCheckingDate = false;
+      return false;
     }
 
     // Initialize app
@@ -965,18 +975,21 @@
       document.querySelector('.tab-bar').style.display = 'flex';
     }
 
-    // Today page
-    async function loadTodayPage() {
-      // Check if date has changed first
-      await checkDateChange();
+    // Today page - internal version without date check (to prevent recursion)
+    async function loadTodayPageWithoutDateCheck() {
+      // Get today's date fresh (always get current date, not cached)
       const today = getTodayDate();
+      console.log('Loading page for date:', today, 'Last known date:', lastKnownDate);
       document.getElementById('today-date').textContent = formatDate(today);
 
-      // Load existing entry
+      // Load existing entry for TODAY (fresh lookup, not cached)
       const entry = await getEntry(today);
+      console.log('Entry found for', today, ':', entry ? 'Yes' : 'No');
       const prefs = await getPreferences();
       
+      // Always reset form fields first, then populate if entry exists
       if (entry) {
+        // Entry exists for today
         document.getElementById('mood-input').value = entry.mood || 5;
         document.getElementById('mood-value').textContent = entry.mood || 5;
         updateMoodBar('mood-bar', 'mood-bar-fill', entry.mood || 5);
@@ -990,6 +1003,7 @@
           : '';
         document.getElementById('weight-input').value = entry.weight || '';
       } else {
+        // No entry for today - reset to defaults
         document.getElementById('mood-input').value = 5;
         document.getElementById('mood-value').textContent = '5';
         updateMoodBar('mood-bar', 'mood-bar-fill', 5);
@@ -1006,6 +1020,14 @@
       } else {
         document.getElementById('habits-card').style.display = 'none';
       }
+    }
+
+    // Today page - public version with date check
+    async function loadTodayPage() {
+      // Check if date has changed first
+      await checkDateChange();
+      // Then load the page (without checking again to prevent recursion)
+      await loadTodayPageWithoutDateCheck();
     }
 
     function updateMoodBar(barId, fillId, value) {
@@ -1127,7 +1149,9 @@
     }
 
     async function saveTodayEntry() {
+      // Always get fresh date (in case it changed)
       const today = getTodayDate();
+      console.log('Saving entry for date:', today);
       const mood = parseInt(document.getElementById('mood-input').value);
       const highlight = document.getElementById('highlight-input').value.trim();
       const journal = document.getElementById('journal-modal-input')?.value.trim() || '';
