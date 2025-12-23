@@ -16,6 +16,8 @@
   --success: #34C759;
   --danger: #FF3B30;
   --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --accent-green: #2D5016;
+  --accent-green-light: #E8F5E9;
 }
 
 [data-theme="dark"] {
@@ -25,6 +27,8 @@
   --text-secondary: #98989D;
   --border: #38383A;
   --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --accent-purple: #B19CD9;
+  --accent-purple-light: #2D1B3D;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +39,8 @@
     --text-secondary: #98989D;
     --border: #38383A;
     --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --accent-purple: #B19CD9;
+    --accent-purple-light: #2D1B3D;
   }
 }
 
@@ -85,6 +91,14 @@ body {
 
 .tab-btn.active {
   color: var(--primary-color);
+}
+
+[data-theme="light"] .tab-btn.active {
+  color: var(--accent-green);
+}
+
+[data-theme="dark"] .tab-btn.active {
+  color: var(--accent-purple);
 }
 
 .tab-icon {
@@ -138,6 +152,15 @@ body {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, background-color 0.3s ease;
   animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   animation-fill-mode: both;
+  border-left: 4px solid transparent;
+}
+
+[data-theme="light"] .card {
+  border-left-color: var(--accent-green);
+}
+
+[data-theme="dark"] .card {
+  border-left-color: var(--accent-purple);
 }
 
 .card:nth-child(1) { animation-delay: 0.05s; }
@@ -418,6 +441,14 @@ button {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+}
+
+[data-theme="light"] .save-btn {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-green) 100%);
+}
+
+[data-theme="dark"] .save-btn {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-purple) 100%);
 }
 
 .save-btn::before {
@@ -951,7 +982,7 @@ button {
 
 .history-header {
   display: grid;
-  grid-template-columns: 1fr auto 32px 32px 32px;
+  grid-template-columns: 1fr 60px 32px 32px 32px;
   gap: 8px;
   align-items: center;
   padding: 12px 18px;

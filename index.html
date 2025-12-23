@@ -242,6 +242,20 @@
   <div id="history-tab" class="tab-content">
     <div class="page-header">
       <h1>History</h1>
+      
+      <!-- Calendar View -->
+      <div class="card" style="margin-top: 16px;">
+        <div class="calendar-header">
+          <h2>Calendar View</h2>
+          <select id="calendar-view-select" class="calendar-select">
+            <option value="mood">Mood</option>
+            <option value="journal">Journal</option>
+          </select>
+        </div>
+        <div id="calendar-container" class="calendar-container"></div>
+      </div>
+      
+      <h3 style="margin-top: 24px;">Select Top 3 Habits for History View</h3>
       <button class="settings-icon-btn" id="top-habits-settings-btn" title="Set Top 3 Habits">⚙️</button>
     </div>
 
@@ -596,6 +610,14 @@
       if (openEditJournalBtn) {
         openEditJournalBtn.addEventListener('click', () => openJournalModal(true));
       }
+      
+      // Calendar view selector
+      const calendarSelect = document.getElementById('calendar-view-select');
+      if (calendarSelect) {
+        calendarSelect.addEventListener('change', async () => {
+          await loadCalendar();
+        });
+      }
       document.getElementById('screen-time-help').addEventListener('click', () => {
         const instructions = document.getElementById('screen-time-instructions');
         instructions.style.display = instructions.style.display === 'none' ? 'block' : 'none';
@@ -873,6 +895,7 @@
         loadStatsPage();
       } else if (tabName === 'history') {
         loadHistoryPage();
+        loadCalendar();
       }
     }
 
@@ -1724,6 +1747,113 @@
       }, 2000);
     }
 
+    // Calendar view
+    async function loadCalendar() {
+      const container = document.getElementById('calendar-container');
+      if (!container) return;
+      
+      const viewType = document.getElementById('calendar-view-select')?.value || 'mood';
+      const entries = await getAllEntries();
+      const habits = await getHabits();
+      
+      // Populate dropdown with habits
+      const select = document.getElementById('calendar-view-select');
+      if (select) {
+        // Remove existing habit options
+        const existingHabits = Array.from(select.options).filter(opt => opt.value.startsWith('habit-'));
+        existingHabits.forEach(opt => opt.remove());
+        
+        // Add habit options after journal
+        habits.forEach(habit => {
+          const option = document.createElement('option');
+          option.value = `habit-${habit.id}`;
+          option.textContent = habit.name;
+          select.appendChild(option);
+        });
+      }
+      
+      // Get current month
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      
+      // Get first day of month and number of days
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startDayOfWeek = firstDay.getDay();
+      
+      // Create calendar grid
+      let calendarHtml = '<div class="calendar-grid">';
+      
+      // Day headers
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      dayNames.forEach(day => {
+        calendarHtml += `<div class="calendar-day-header">${day}</div>`;
+      });
+      
+      // Empty cells for days before month starts
+      for (let i = 0; i < startDayOfWeek; i++) {
+        calendarHtml += '<div class="calendar-day empty"></div>';
+      }
+      
+      // Days of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const entry = entries.find(e => e.date === dateStr);
+        
+        let colorClass = 'empty';
+        let status = '';
+        
+        if (viewType === 'mood') {
+          if (entry && entry.mood) {
+            if (entry.mood >= 7) {
+              colorClass = 'good';
+            } else if (entry.mood >= 4) {
+              colorClass = 'neutral';
+            } else {
+              colorClass = 'bad';
+            }
+            status = entry.mood;
+          }
+        } else if (viewType === 'journal') {
+          if (entry && entry.journal && entry.journal.trim().length > 0) {
+            colorClass = 'good';
+            status = '✓';
+          }
+        } else if (viewType.startsWith('habit-')) {
+          const habitId = parseInt(viewType.split('-')[1]);
+          if (entry && entry.habitCompletions && entry.habitCompletions[habitId]) {
+            colorClass = 'good';
+            status = '✓';
+          } else if (entry) {
+            colorClass = 'bad';
+            status = '○';
+          }
+        }
+        
+        calendarHtml += `
+          <div class="calendar-day ${colorClass}" data-date="${dateStr}" title="${dateStr}">
+            <span class="calendar-day-number">${day}</span>
+            ${status ? `<span class="calendar-status">${status}</span>` : ''}
+          </div>
+        `;
+      }
+      
+      calendarHtml += '</div>';
+      container.innerHTML = calendarHtml;
+      
+      // Add click listeners
+      container.querySelectorAll('.calendar-day:not(.empty)').forEach(day => {
+        day.addEventListener('click', () => {
+          const date = day.dataset.date;
+          if (date) {
+            openHistoryModal(date);
+          }
+        });
+      });
+    }
+    
     // Utility
     function escapeHtml(text) {
       const div = document.createElement('div');
