@@ -237,10 +237,6 @@
       <div id="most-consistent-habits"></div>
     </div>
 
-    <div class="card">
-      <h2>Monthly Stats</h2>
-      <div id="monthly-stats-container"></div>
-    </div>
   </div>
 
   <!-- History Tab -->
@@ -1135,10 +1131,8 @@
       }
       
       container.innerHTML = habits.map((habit, index) => `
-        <div class="habit-item" data-habit-id="${habit.id}" data-index="${index}">
-          <div class="habit-order-controls">
-            <input type="number" class="habit-order-input" data-habit-id="${habit.id}" value="${index + 1}" min="1" max="${habits.length}" />
-          </div>
+        <div class="habit-item draggable" draggable="true" data-habit-id="${habit.id}" data-index="${index}">
+          <span class="drag-handle">☰</span>
           <span class="habit-name">${escapeHtml(habit.name)}</span>
           <div class="habit-actions">
             <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
@@ -1147,14 +1141,8 @@
         </div>
       `).join('');
 
-      // Add order input listeners
-      container.querySelectorAll('.habit-order-input').forEach(input => {
-        input.addEventListener('change', async (e) => {
-          const habitId = parseInt(e.target.dataset.habitId);
-          const newPosition = parseInt(e.target.value) - 1;
-          await reorderHabit(habitId, newPosition);
-        });
-      });
+      // Setup drag and drop
+      setupHabitDragAndDrop(container);
 
       // Add edit listeners
       document.querySelectorAll('.edit-habit-btn').forEach(btn => {
@@ -1188,23 +1176,65 @@
       });
     }
 
-    async function reorderHabit(habitId, newPosition) {
+    function setupHabitDragAndDrop(container) {
+      let draggedElement = null;
+
+      container.querySelectorAll('.draggable').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          draggedElement = item;
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', async () => {
+          item.classList.remove('dragging');
+          if (draggedElement) {
+            await saveHabitOrder(container);
+            draggedElement = null;
+          }
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          
+          if (!draggedElement || draggedElement === item) return;
+          
+          const afterElement = getDragAfterElement(container, e.clientY);
+          if (afterElement == null) {
+            container.appendChild(draggedElement);
+          } else {
+            container.insertBefore(draggedElement, afterElement);
+          }
+        });
+
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+        });
+      });
+    }
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+      
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    async function saveHabitOrder(container) {
       const habits = await getHabits();
-      const prefs = await getPreferences();
-      let order = prefs.habitOrder || habits.map(h => h.id);
-      
-      // Remove habit from current position
-      const currentIndex = order.indexOf(habitId);
-      if (currentIndex === -1) return;
-      
-      order.splice(currentIndex, 1);
-      
-      // Insert at new position
-      const clampedPosition = Math.max(0, Math.min(newPosition, order.length));
-      order.splice(clampedPosition, 0, habitId);
-      
+      const order = Array.from(container.querySelectorAll('.draggable')).map(item => 
+        parseInt(item.dataset.habitId)
+      );
       await setPreference('habitOrder', order);
-      await renderHabitsList();
       
       // Reload history if visible
       if (document.getElementById('history-tab').classList.contains('active')) {
@@ -1307,7 +1337,6 @@
       await renderWeightChart();
       await renderJournalConsistency();
       await renderMostConsistentHabits();
-      await renderMonthlyStats();
     }
 
     async function renderHabitStats() {
