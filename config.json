@@ -1,6 +1,6 @@
 {
-  "title": "My Alerts",
   "notify": true,
-  "notificationText": "Hello from GitHub Pages!",
-  "version": 1
+  "notificationText": "Log your mood + habits today!",
+  "version": 1,
+  "reminderTimes": ["09:00", "21:00"]
 }

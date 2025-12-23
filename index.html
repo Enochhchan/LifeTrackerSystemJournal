@@ -1,64 +1,910 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>My Phone App</title>
-  <style>
-    body { font-family: -apple-system, system-ui; margin: 16px; }
-    .card { padding: 12px; border: 1px solid #ddd; border-radius: 12px; margin: 12px 0; }
-    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff; }
-    input { padding: 10px; border-radius: 10px; border: 1px solid #ccc; width: 100%; }
-    small { color: #666; }
-    pre { white-space: pre-wrap; word-wrap: break-word; }
-  </style>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#007AFF" />
+  <title>Habit Journal</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h2>My Phone App</h2>
+  <!-- Today Tab -->
+  <div id="today-tab" class="tab-content active">
+    <div class="page-header">
+      <h1>Today</h1>
+      <div class="date-display" id="today-date"></div>
+    </div>
 
-  <div class="card">
-    <div><b>Config URL</b></div>
-    <input id="configUrl" placeholder="Paste your config.json URL here" />
-    <small>Saved on this device only.</small>
-    <div style="height:10px"></div>
-    <button onclick="saveUrl()">Save URL</button>
-    <button onclick="loadConfig()">Load Config</button>
+    <div class="card">
+      <label for="mood-input">Mood (1-10)</label>
+      <div class="mood-container">
+        <input type="range" id="mood-input" min="1" max="10" value="5" />
+        <div class="mood-value" id="mood-value">5</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="highlight-input">Highlight of the Day</label>
+      <input type="text" id="highlight-input" placeholder="What made today special?" />
+    </div>
+
+    <div class="card">
+      <label>Habits</label>
+      <div id="habits-checklist"></div>
+      <div class="empty-state" id="habits-empty" style="display: none;">
+        <p>No habits yet. Add some in the Habits tab!</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="journal-input">Journal</label>
+      <textarea id="journal-input" rows="6" placeholder="Write about your day..."></textarea>
+    </div>
+
+    <div class="card">
+      <label for="screen-time-input">Screen Time (minutes)</label>
+      <div class="screen-time-container">
+        <input type="number" id="screen-time-input" placeholder="Optional" min="0" />
+        <button type="button" class="helper-btn" id="screen-time-help">How to find</button>
+      </div>
+      <div id="screen-time-instructions" class="helper-text" style="display: none;">
+        <p>To find your Screen Time:</p>
+        <ol>
+          <li>Open Settings app</li>
+          <li>Tap "Screen Time"</li>
+          <li>View today's total at the top</li>
+        </ol>
+      </div>
+    </div>
+
+    <button class="save-btn" id="save-today-btn">Save Entry</button>
+    <div id="save-status" class="save-status"></div>
   </div>
 
-  <div class="card">
-    <div><b>Latest Config</b></div>
-    <pre id="out">(nothing loaded yet)</pre>
+  <!-- Habits Tab -->
+  <div id="habits-tab" class="tab-content">
+    <div class="page-header">
+      <h1>Habits</h1>
+    </div>
+
+    <div class="card">
+      <div class="add-habit-container">
+        <input type="text" id="new-habit-input" placeholder="Enter habit name" />
+        <button class="add-btn" id="add-habit-btn">Add</button>
+      </div>
+    </div>
+
+    <div id="habits-list" class="habits-list"></div>
+    <div class="empty-state" id="habits-list-empty" style="display: none;">
+      <p>No habits yet. Add your first habit above!</p>
+    </div>
   </div>
 
+  <!-- Stats Tab -->
+  <div id="stats-tab" class="tab-content">
+    <div class="page-header">
+      <h1>Stats</h1>
+    </div>
+
+    <div class="card">
+      <h2>Habit Completion</h2>
+      <div id="habit-stats-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>Mood Trend (Last 30 Days)</h2>
+      <canvas id="mood-chart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Journal Consistency</h2>
+      <div id="journal-consistency"></div>
+    </div>
+
+    <div class="card">
+      <h2>Most Consistent Habits</h2>
+      <div id="most-consistent-habits"></div>
+    </div>
+  </div>
+
+  <!-- History Tab -->
+  <div id="history-tab" class="tab-content">
+    <div class="page-header">
+      <h1>History</h1>
+    </div>
+
+    <div id="history-list" class="history-list"></div>
+    <div class="empty-state" id="history-empty" style="display: none;">
+      <p>No entries yet. Start by saving your first entry in the Today tab!</p>
+    </div>
+  </div>
+
+  <!-- History Entry Detail Modal -->
+  <div id="history-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-date"></h2>
+        <button class="close-btn" id="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card">
+          <label>Mood</label>
+          <div id="modal-mood"></div>
+        </div>
+        <div class="card">
+          <label>Highlight</label>
+          <div id="modal-highlight"></div>
+        </div>
+        <div class="card">
+          <label>Habits</label>
+          <div id="modal-habits"></div>
+        </div>
+        <div class="card">
+          <label>Journal</label>
+          <div id="modal-journal"></div>
+        </div>
+        <div class="card">
+          <label>Screen Time</label>
+          <div id="modal-screen-time"></div>
+        </div>
+        <button class="save-btn" id="edit-entry-btn">Edit Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Entry Modal -->
+  <div id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="edit-modal-date"></h2>
+        <button class="close-btn" id="close-edit-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card">
+          <label for="edit-mood-input">Mood (1-10)</label>
+          <div class="mood-container">
+            <input type="range" id="edit-mood-input" min="1" max="10" value="5" />
+            <div class="mood-value" id="edit-mood-value">5</div>
+          </div>
+        </div>
+        <div class="card">
+          <label for="edit-highlight-input">Highlight</label>
+          <input type="text" id="edit-highlight-input" />
+        </div>
+        <div class="card">
+          <label>Habits</label>
+          <div id="edit-habits-checklist"></div>
+        </div>
+        <div class="card">
+          <label for="edit-journal-input">Journal</label>
+          <textarea id="edit-journal-input" rows="6"></textarea>
+        </div>
+        <div class="card">
+          <label for="edit-screen-time-input">Screen Time (minutes)</label>
+          <input type="number" id="edit-screen-time-input" min="0" />
+        </div>
+        <button class="save-btn" id="save-edit-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Habit Edit Modal -->
+  <div id="habit-edit-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit Habit</h2>
+        <button class="close-btn" id="close-habit-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card">
+          <label for="edit-habit-name-input">Habit Name</label>
+          <input type="text" id="edit-habit-name-input" />
+        </div>
+        <button class="save-btn" id="save-habit-edit-btn">Save</button>
+        <button class="delete-btn" id="delete-habit-btn">Delete Habit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Tab Bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="today">
+      <span class="tab-icon">📅</span>
+      <span class="tab-label">Today</span>
+    </button>
+    <button class="tab-btn" data-tab="habits">
+      <span class="tab-icon">✓</span>
+      <span class="tab-label">Habits</span>
+    </button>
+    <button class="tab-btn" data-tab="stats">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Stats</span>
+    </button>
+    <button class="tab-btn" data-tab="history">
+      <span class="tab-icon">📜</span>
+      <span class="tab-label">History</span>
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <span class="tab-icon">⚙️</span>
+      <span class="tab-label">Settings</span>
+    </button>
+  </nav>
+
+  <!-- Settings Tab -->
+  <div id="settings-tab" class="tab-content">
+    <div class="page-header">
+      <h1>Settings</h1>
+    </div>
+
+    <div class="card">
+      <h2>Export Data</h2>
+      <p>Download all your data as a JSON file for backup.</p>
+      <button class="save-btn" id="export-btn">Export Data</button>
+    </div>
+
+    <div class="card">
+      <h2>Import Data</h2>
+      <p>Restore your data from a previously exported JSON file.</p>
+      <input type="file" id="import-file" accept=".json" style="display: none;" />
+      <button class="save-btn" id="import-btn">Import Data</button>
+      <div id="import-status" class="save-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Reset Data</h2>
+      <p>Permanently delete all habits and entries. This cannot be undone.</p>
+      <button class="delete-btn" id="reset-btn">Reset All Data</button>
+    </div>
+
+    <div class="card">
+      <h2>Config URL</h2>
+      <p>For iOS Shortcuts automation (optional).</p>
+      <input type="text" id="config-url-input" placeholder="https://username.github.io/repo/config.json" />
+      <button class="save-btn" id="save-config-url-btn">Save URL</button>
+      <div id="config-url-status" class="save-status"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
   <script>
-    const KEY = "my_app_config_url";
+    // Global state
+    let currentEditingDate = null;
+    let currentEditingHabitId = null;
+    let moodChart = null;
 
-    function saveUrl() {
-      const url = document.getElementById("configUrl").value.trim();
-      localStorage.setItem(KEY, url);
-      alert("Saved!");
+    // Initialize app
+    async function init() {
+      try {
+        await initDB();
+        setupEventListeners();
+        loadTodayPage();
+        updateTabBar();
+      } catch (error) {
+        console.error('Initialization error:', error);
+        alert('Failed to initialize app: ' + error.message);
+      }
     }
 
-    async function loadConfig() {
-      const url = localStorage.getItem(KEY);
-      if (!url) {
-        alert("Save a config URL first.");
+    // Tab navigation
+    function setupEventListeners() {
+      // Tab bar buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          switchTab(tab);
+        });
+      });
+
+      // Today page
+      document.getElementById('mood-input').addEventListener('input', (e) => {
+        document.getElementById('mood-value').textContent = e.target.value;
+      });
+      document.getElementById('save-today-btn').addEventListener('click', saveTodayEntry);
+      document.getElementById('screen-time-help').addEventListener('click', () => {
+        const instructions = document.getElementById('screen-time-instructions');
+        instructions.style.display = instructions.style.display === 'none' ? 'block' : 'none';
+      });
+
+      // Habits page
+      document.getElementById('add-habit-btn').addEventListener('click', handleAddHabit);
+      document.getElementById('new-habit-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleAddHabit();
+      });
+
+      // History modals
+      document.getElementById('close-modal').addEventListener('click', () => {
+        document.getElementById('history-modal').style.display = 'none';
+      });
+      document.getElementById('close-edit-modal').addEventListener('click', () => {
+        document.getElementById('edit-modal').style.display = 'none';
+      });
+      document.getElementById('edit-entry-btn').addEventListener('click', openEditModal);
+      document.getElementById('save-edit-btn').addEventListener('click', saveEditEntry);
+
+      // Habit edit modal
+      document.getElementById('close-habit-modal').addEventListener('click', () => {
+        document.getElementById('habit-edit-modal').style.display = 'none';
+      });
+      document.getElementById('save-habit-edit-btn').addEventListener('click', saveHabitEdit);
+      document.getElementById('delete-habit-btn').addEventListener('click', deleteHabitConfirm);
+
+      // Edit modal mood slider
+      document.getElementById('edit-mood-input').addEventListener('input', (e) => {
+        document.getElementById('edit-mood-value').textContent = e.target.value;
+      });
+
+      // Settings
+      document.getElementById('export-btn').addEventListener('click', handleExportData);
+      document.getElementById('import-btn').addEventListener('click', () => {
+        document.getElementById('import-file').click();
+      });
+      document.getElementById('import-file').addEventListener('change', handleImportData);
+      document.getElementById('reset-btn').addEventListener('click', resetDataConfirm);
+      document.getElementById('save-config-url-btn').addEventListener('click', saveConfigUrl);
+
+      // Load saved config URL
+      const savedConfigUrl = localStorage.getItem('habit_journal_config_url');
+      if (savedConfigUrl) {
+        document.getElementById('config-url-input').value = savedConfigUrl;
+      }
+    }
+
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+
+      // Show selected tab
+      const tabElement = document.getElementById(`${tabName}-tab`);
+      if (tabElement) {
+        tabElement.classList.add('active');
+      }
+
+      // Update tab bar
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+      });
+
+      // Load tab-specific content
+      if (tabName === 'today') {
+        loadTodayPage();
+      } else if (tabName === 'habits') {
+        loadHabitsPage();
+      } else if (tabName === 'stats') {
+        loadStatsPage();
+      } else if (tabName === 'history') {
+        loadHistoryPage();
+      }
+    }
+
+    function updateTabBar() {
+      // Ensure tab bar is visible
+      document.querySelector('.tab-bar').style.display = 'flex';
+    }
+
+    // Today page
+    async function loadTodayPage() {
+      const today = getTodayDate();
+      document.getElementById('today-date').textContent = formatDate(today);
+
+      // Load existing entry
+      const entry = await getEntry(today);
+      if (entry) {
+        document.getElementById('mood-input').value = entry.mood || 5;
+        document.getElementById('mood-value').textContent = entry.mood || 5;
+        document.getElementById('highlight-input').value = entry.highlight || '';
+        document.getElementById('journal-input').value = entry.journal || '';
+        document.getElementById('screen-time-input').value = entry.screenTime || '';
+      } else {
+        document.getElementById('mood-input').value = 5;
+        document.getElementById('mood-value').textContent = '5';
+        document.getElementById('highlight-input').value = '';
+        document.getElementById('journal-input').value = '';
+        document.getElementById('screen-time-input').value = '';
+      }
+
+      // Load habits checklist
+      await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+    }
+
+    async function loadHabitsChecklist(containerId, completions = {}) {
+      const container = document.getElementById(containerId);
+      const habits = await getHabits();
+
+      if (habits.length === 0) {
+        if (containerId === 'habits-checklist') {
+          document.getElementById('habits-empty').style.display = 'block';
+        }
+        container.innerHTML = '';
         return;
       }
+
+      if (containerId === 'habits-checklist') {
+        document.getElementById('habits-empty').style.display = 'none';
+      }
+
+      container.innerHTML = habits.map(habit => `
+        <label class="habit-checkbox">
+          <input type="checkbox" data-habit-id="${habit.id}" ${completions[habit.id] ? 'checked' : ''} />
+          <span>${escapeHtml(habit.name)}</span>
+        </label>
+      `).join('');
+    }
+
+    async function saveTodayEntry() {
+      const today = getTodayDate();
+      const mood = parseInt(document.getElementById('mood-input').value);
+      const highlight = document.getElementById('highlight-input').value.trim();
+      const journal = document.getElementById('journal-input').value.trim();
+      const screenTime = document.getElementById('screen-time-input').value.trim();
+      const screenTimeNum = screenTime ? parseInt(screenTime) : null;
+
+      // Get habit completions
+      const habitCompletions = {};
+      document.querySelectorAll('#habits-checklist input[type="checkbox"]').forEach(checkbox => {
+        habitCompletions[parseInt(checkbox.dataset.habitId)] = checkbox.checked;
+      });
+
       try {
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const json = await res.json();
-        document.getElementById("out").textContent = JSON.stringify(json, null, 2);
-      } catch (e) {
-        document.getElementById("out").textContent = "Error loading config: " + e;
+        await saveEntry(today, {
+          mood,
+          highlight,
+          journal,
+          screenTime: screenTimeNum,
+          habitCompletions
+        });
+
+        const statusEl = document.getElementById('save-status');
+        statusEl.textContent = 'Saved!';
+        statusEl.className = 'save-status success';
+        setTimeout(() => {
+          statusEl.textContent = '';
+          statusEl.className = 'save-status';
+        }, 2000);
+      } catch (error) {
+        alert('Failed to save entry: ' + error.message);
       }
     }
 
-    // load saved url into the input on startup
-    const saved = localStorage.getItem(KEY);
-    if (saved) document.getElementById("configUrl").value = saved;
+    // Habits page
+    async function loadHabitsPage() {
+      await renderHabitsList();
+    }
+
+    async function renderHabitsList() {
+      const container = document.getElementById('habits-list');
+      const emptyState = document.getElementById('habits-list-empty');
+      const habits = await getHabits();
+
+      if (habits.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      container.innerHTML = habits.map(habit => `
+        <div class="habit-item">
+          <span class="habit-name">${escapeHtml(habit.name)}</span>
+          <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
+        </div>
+      `).join('');
+
+      // Add edit listeners
+      document.querySelectorAll('.edit-habit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const habitId = parseInt(btn.dataset.habitId);
+          openHabitEditModal(habitId);
+        });
+      });
+    }
+
+    async function handleAddHabit() {
+      const input = document.getElementById('new-habit-input');
+      const name = input.value.trim();
+
+      if (!name) {
+        alert('Please enter a habit name');
+        return;
+      }
+
+      try {
+        await addHabit(name);
+        input.value = '';
+        await renderHabitsList();
+        // Reload checklist on Today page if it's visible
+        if (document.getElementById('today-tab').classList.contains('active')) {
+          const entry = await getEntry(getTodayDate());
+          await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+        }
+      } catch (error) {
+        alert('Failed to add habit: ' + error.message);
+      }
+    }
+
+    async function openHabitEditModal(habitId) {
+      currentEditingHabitId = habitId;
+      const habits = await getHabits();
+      const habit = habits.find(h => h.id === habitId);
+
+      if (habit) {
+        document.getElementById('edit-habit-name-input').value = habit.name;
+        document.getElementById('habit-edit-modal').style.display = 'block';
+      }
+    }
+
+    async function saveHabitEdit() {
+      const name = document.getElementById('edit-habit-name-input').value.trim();
+
+      if (!name) {
+        alert('Please enter a habit name');
+        return;
+      }
+
+      try {
+        await updateHabit(currentEditingHabitId, name);
+        document.getElementById('habit-edit-modal').style.display = 'none';
+        await renderHabitsList();
+        // Reload checklist on Today page if it's visible
+        if (document.getElementById('today-tab').classList.contains('active')) {
+          const entry = await getEntry(getTodayDate());
+          await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+        }
+      } catch (error) {
+        alert('Failed to update habit: ' + error.message);
+      }
+    }
+
+    async function deleteHabitConfirm() {
+      if (confirm('Are you sure you want to delete this habit? This will remove it from all entries.')) {
+        try {
+          await deleteHabit(currentEditingHabitId);
+          document.getElementById('habit-edit-modal').style.display = 'none';
+          await renderHabitsList();
+          // Reload checklist on Today page if it's visible
+          if (document.getElementById('today-tab').classList.contains('active')) {
+            const entry = await getEntry(getTodayDate());
+            await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+          }
+        } catch (error) {
+          alert('Failed to delete habit: ' + error.message);
+        }
+      }
+    }
+
+    // Stats page
+    async function loadStatsPage() {
+      await renderHabitStats();
+      await renderMoodChart();
+      await renderJournalConsistency();
+      await renderMostConsistentHabits();
+    }
+
+    async function renderHabitStats() {
+      const container = document.getElementById('habit-stats-container');
+      const habits = await getHabits();
+
+      if (habits.length === 0) {
+        container.innerHTML = '<p>No habits to display stats for.</p>';
+        return;
+      }
+
+      const statsHtml = await Promise.all(habits.map(async (habit) => {
+        const stats7d = await calculateHabitStats(habit.id, 7);
+        const stats30d = await calculateHabitStats(habit.id, 30);
+        const statsAll = await calculateHabitStats(habit.id, 9999);
+        const streak = await calculateHabitStreak(habit.id);
+
+        return `
+          <div class="habit-stat-item">
+            <h3>${escapeHtml(habit.name)}</h3>
+            <div class="stat-row">
+              <span>7 days:</span>
+              <span>${stats7d.completed}/${stats7d.total} (${stats7d.rate}%)</span>
+            </div>
+            <div class="stat-row">
+              <span>30 days:</span>
+              <span>${stats30d.completed}/${stats30d.total} (${stats30d.rate}%)</span>
+            </div>
+            <div class="stat-row">
+              <span>All time:</span>
+              <span>${statsAll.completed}/${statsAll.total} (${statsAll.rate}%)</span>
+            </div>
+            <div class="stat-row">
+              <span>Current streak:</span>
+              <span>${streak.current} days</span>
+            </div>
+            <div class="stat-row">
+              <span>Longest streak:</span>
+              <span>${streak.longest} days</span>
+            </div>
+          </div>
+        `;
+      }));
+
+      container.innerHTML = statsHtml.join('');
+    }
+
+    async function renderMoodChart() {
+      const moodData = await getMoodTrend(30);
+      const ctx = document.getElementById('mood-chart').getContext('2d');
+
+      if (moodChart) {
+        moodChart.destroy();
+      }
+
+      if (moodData.length === 0) {
+        document.getElementById('mood-chart').parentElement.innerHTML = '<p>No mood data available yet.</p>';
+        return;
+      }
+
+      moodChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: moodData.map(d => formatDateShort(d.date)),
+          datasets: [{
+            label: 'Mood',
+            data: moodData.map(d => d.mood),
+            borderColor: '#007AFF',
+            backgroundColor: 'rgba(0, 122, 255, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 1.5,
+          scales: {
+            y: {
+              beginAtZero: false,
+              min: 1,
+              max: 10,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    async function renderJournalConsistency() {
+      const consistency = await getJournalConsistency();
+      const container = document.getElementById('journal-consistency');
+      const rate = consistency.total > 0 ? Math.round((consistency.journaled / consistency.total) * 100) : 0;
+
+      container.innerHTML = `
+        <div class="stat-row">
+          <span>Days journaled:</span>
+          <span>${consistency.journaled} / ${consistency.total}</span>
+        </div>
+        <div class="stat-row">
+          <span>Consistency rate:</span>
+          <span>${rate}%</span>
+        </div>
+      `;
+    }
+
+    async function renderMostConsistentHabits() {
+      const topHabits = await getMostConsistentHabits();
+      const container = document.getElementById('most-consistent-habits');
+
+      if (topHabits.length === 0) {
+        container.innerHTML = '<p>No habit data available yet.</p>';
+        return;
+      }
+
+      container.innerHTML = topHabits.map((item, index) => `
+        <div class="stat-row">
+          <span>${index + 1}. ${escapeHtml(item.habit.name)}</span>
+          <span>${item.rate}% (30 days)</span>
+        </div>
+      `).join('');
+    }
+
+    // History page
+    async function loadHistoryPage() {
+      const entries = await getAllEntries();
+      const container = document.getElementById('history-list');
+      const emptyState = document.getElementById('history-empty');
+
+      if (entries.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      const sortedEntries = entries.sort((a, b) => b.date.localeCompare(a.date));
+
+      container.innerHTML = sortedEntries.map(entry => `
+        <div class="history-item" data-date="${entry.date}">
+          <div class="history-item-header">
+            <span class="history-date">${formatDateShort(entry.date)}</span>
+            ${entry.mood ? `<span class="history-mood">Mood: ${entry.mood}/10</span>` : ''}
+          </div>
+          ${entry.highlight ? `<div class="history-highlight">${escapeHtml(entry.highlight)}</div>` : ''}
+        </div>
+      `).join('');
+
+      // Add click listeners
+      document.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const date = item.dataset.date;
+          openHistoryModal(date);
+        });
+      });
+    }
+
+    async function openHistoryModal(date) {
+      const entry = await getEntry(date);
+      if (!entry) return;
+
+      document.getElementById('modal-date').textContent = formatDate(date);
+      document.getElementById('modal-mood').textContent = entry.mood ? `${entry.mood}/10` : 'Not set';
+      document.getElementById('modal-highlight').textContent = entry.highlight || 'None';
+      document.getElementById('modal-journal').textContent = entry.journal || 'No journal entry';
+      document.getElementById('modal-screen-time').textContent = entry.screenTime ? `${entry.screenTime} minutes` : 'Not set';
+
+      // Load habits for this entry
+      const habits = await getHabits();
+      const completions = entry.habitCompletions || {};
+      const habitsHtml = habits.length > 0
+        ? habits.map(h => `<div>${completions[h.id] ? '✓' : '○'} ${escapeHtml(h.name)}</div>`).join('')
+        : '<div>No habits</div>';
+      document.getElementById('modal-habits').innerHTML = habitsHtml;
+
+      currentEditingDate = date;
+      document.getElementById('history-modal').style.display = 'block';
+    }
+
+    async function openEditModal() {
+      document.getElementById('history-modal').style.display = 'none';
+      const entry = await getEntry(currentEditingDate);
+      if (!entry) return;
+
+      document.getElementById('edit-modal-date').textContent = formatDate(currentEditingDate);
+      document.getElementById('edit-mood-input').value = entry.mood || 5;
+      document.getElementById('edit-mood-value').textContent = entry.mood || 5;
+      document.getElementById('edit-highlight-input').value = entry.highlight || '';
+      document.getElementById('edit-journal-input').value = entry.journal || '';
+      document.getElementById('edit-screen-time-input').value = entry.screenTime || '';
+
+      await loadHabitsChecklist('edit-habits-checklist', entry.habitCompletions || {});
+      document.getElementById('edit-modal').style.display = 'block';
+    }
+
+    async function saveEditEntry() {
+      const mood = parseInt(document.getElementById('edit-mood-input').value);
+      const highlight = document.getElementById('edit-highlight-input').value.trim();
+      const journal = document.getElementById('edit-journal-input').value.trim();
+      const screenTime = document.getElementById('edit-screen-time-input').value.trim();
+      const screenTimeNum = screenTime ? parseInt(screenTime) : null;
+
+      // Get habit completions
+      const habitCompletions = {};
+      document.querySelectorAll('#edit-habits-checklist input[type="checkbox"]').forEach(checkbox => {
+        habitCompletions[parseInt(checkbox.dataset.habitId)] = checkbox.checked;
+      });
+
+      try {
+        await saveEntry(currentEditingDate, {
+          mood,
+          highlight,
+          journal,
+          screenTime: screenTimeNum,
+          habitCompletions
+        });
+
+        document.getElementById('edit-modal').style.display = 'none';
+        await loadHistoryPage();
+        if (currentEditingDate === getTodayDate()) {
+          await loadTodayPage();
+        }
+      } catch (error) {
+        alert('Failed to save entry: ' + error.message);
+      }
+    }
+
+    // Settings page
+    async function handleExportData() {
+      try {
+        const data = await exportData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `habit-journal-export-${getTodayDate()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert('Failed to export data: ' + error.message);
+      }
+    }
+
+    async function handleImportData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const json = JSON.parse(e.target.result);
+          await importData(json);
+          document.getElementById('import-status').textContent = 'Import successful!';
+          document.getElementById('import-status').className = 'save-status success';
+          
+          // Reload all pages
+          await loadTodayPage();
+          await loadHabitsPage();
+          await loadStatsPage();
+          await loadHistoryPage();
+          
+          setTimeout(() => {
+            document.getElementById('import-status').textContent = '';
+            document.getElementById('import-status').className = 'save-status';
+          }, 3000);
+        } catch (error) {
+          document.getElementById('import-status').textContent = 'Import failed: ' + error.message;
+          document.getElementById('import-status').className = 'save-status error';
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = ''; // Reset file input
+    }
+
+    async function resetDataConfirm() {
+      if (confirm('Are you sure you want to delete ALL data? This cannot be undone!')) {
+        if (confirm('This will permanently delete all habits and entries. Continue?')) {
+          try {
+            // Delete database
+            indexedDB.deleteDatabase(DB_NAME);
+            // Reload page
+            location.reload();
+          } catch (error) {
+            alert('Failed to reset data: ' + error.message);
+          }
+        }
+      }
+    }
+
+    function saveConfigUrl() {
+      const url = document.getElementById('config-url-input').value.trim();
+      localStorage.setItem('habit_journal_config_url', url);
+      const statusEl = document.getElementById('config-url-status');
+      statusEl.textContent = 'URL saved!';
+      statusEl.className = 'save-status success';
+      setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl.className = 'save-status';
+      }, 2000);
+    }
+
+    // Utility
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize on load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   </script>
 </body>
 </html>
