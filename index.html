@@ -92,8 +92,11 @@
     </div>
 
     <div class="card">
-      <label for="journal-input">Journal</label>
-      <textarea id="journal-input" rows="6" placeholder="Write about your day..."></textarea>
+      <div class="journal-header">
+        <label for="journal-input">Journal</label>
+        <button class="journal-open-btn" id="open-journal-btn">Open Journal</button>
+      </div>
+      <div id="journal-preview" class="journal-preview"></div>
     </div>
 
     <div class="card" id="screen-time-card" style="display: none;">
@@ -318,14 +321,33 @@
           <div id="edit-habits-checklist"></div>
         </div>
         <div class="card">
-          <label for="edit-journal-input">Journal</label>
-          <textarea id="edit-journal-input" rows="6"></textarea>
+          <div class="journal-header">
+            <label>Journal</label>
+            <button class="journal-open-btn" id="open-edit-journal-btn">Open Journal</button>
+          </div>
+          <div id="edit-journal-preview" class="journal-preview"></div>
         </div>
         <div class="card">
           <label for="edit-screen-time-input">Screen Time (minutes)</label>
           <input type="number" id="edit-screen-time-input" min="0" />
         </div>
         <button class="save-btn" id="save-edit-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Journal Modal -->
+  <div id="journal-modal" class="modal" style="display: none;">
+    <div class="modal-content journal-modal-content">
+      <div class="modal-header">
+        <h2>Journal</h2>
+        <button class="close-btn" id="close-journal-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="journal-modal-input" rows="20" placeholder="Write about your day..."></textarea>
+        <div class="journal-char-count">
+          <span id="journal-char-count">0</span> characters
+        </div>
       </div>
     </div>
   </div>
@@ -557,9 +579,23 @@
         debounceSave();
       });
       document.getElementById('highlight-input').addEventListener('input', debounceSave);
-      document.getElementById('journal-input').addEventListener('input', debounceSave);
       document.getElementById('screen-time-input').addEventListener('input', debounceSave);
       document.getElementById('weight-input').addEventListener('input', debounceSave);
+      
+      // Journal modal
+      document.getElementById('open-journal-btn').addEventListener('click', () => openJournalModal(false));
+      document.getElementById('close-journal-modal').addEventListener('click', closeJournalModal);
+      document.getElementById('journal-modal-input').addEventListener('input', (e) => {
+        const count = e.target.value.length;
+        document.getElementById('journal-char-count').textContent = count.toLocaleString();
+        debounceSaveJournal();
+      });
+      
+      // Edit modal journal
+      const openEditJournalBtn = document.getElementById('open-edit-journal-btn');
+      if (openEditJournalBtn) {
+        openEditJournalBtn.addEventListener('click', () => openJournalModal(true));
+      }
       document.getElementById('screen-time-help').addEventListener('click', () => {
         const instructions = document.getElementById('screen-time-instructions');
         instructions.style.display = instructions.style.display === 'none' ? 'block' : 'none';
@@ -859,7 +895,7 @@
         document.getElementById('mood-value').textContent = entry.mood || 5;
         updateMoodBar('mood-bar', 'mood-bar-fill', entry.mood || 5);
         document.getElementById('highlight-input').value = entry.highlight || '';
-        document.getElementById('journal-input').value = entry.journal || '';
+        updateJournalPreview(entry.journal || '');
         document.getElementById('screen-time-input').value = entry.screenTime || '';
         document.getElementById('weight-input').value = entry.weight || '';
       } else {
@@ -867,7 +903,7 @@
         document.getElementById('mood-value').textContent = '5';
         updateMoodBar('mood-bar', 'mood-bar-fill', 5);
         document.getElementById('highlight-input').value = '';
-        document.getElementById('journal-input').value = '';
+        updateJournalPreview('');
         document.getElementById('screen-time-input').value = '';
         document.getElementById('weight-input').value = '';
       }
@@ -889,6 +925,8 @@
       }
     }
 
+    let journalSaveTimeout = null;
+
     function debounceSave() {
       if (saveTimeout) {
         clearTimeout(saveTimeout);
@@ -896,6 +934,63 @@
       saveTimeout = setTimeout(() => {
         saveTodayEntry();
       }, 1000); // Auto-save after 1 second of no input
+    }
+
+    function debounceSaveJournal() {
+      if (journalSaveTimeout) {
+        clearTimeout(journalSaveTimeout);
+      }
+      journalSaveTimeout = setTimeout(() => {
+        saveJournalEntry();
+      }, 1000);
+    }
+
+    async function openJournalModal() {
+      const today = getTodayDate();
+      const entry = await getEntry(today);
+      const journalText = entry?.journal || '';
+      document.getElementById('journal-modal-input').value = journalText;
+      document.getElementById('journal-char-count').textContent = journalText.length.toLocaleString();
+      document.getElementById('journal-modal').style.display = 'flex';
+    }
+
+    function closeJournalModal() {
+      document.getElementById('journal-modal').style.display = 'none';
+      // Update preview
+      const journalText = document.getElementById('journal-modal-input').value;
+      updateJournalPreview(journalText);
+    }
+
+    function updateJournalPreview(text) {
+      const preview = document.getElementById('journal-preview');
+      if (!text || text.trim() === '') {
+        preview.innerHTML = '<p class="journal-preview-empty">No journal entry yet. Click "Open Journal" to start writing.</p>';
+      } else {
+        const previewText = text.length > 150 ? text.substring(0, 150) + '...' : text;
+        preview.innerHTML = `<p>${escapeHtml(previewText)}</p>`;
+      }
+    }
+
+
+    function updateJournalPreview(text) {
+      const preview = document.getElementById('journal-preview');
+      if (!text || text.trim() === '') {
+        preview.innerHTML = '<p class="journal-preview-empty">No journal entry yet. Click "Open Journal" to start writing.</p>';
+      } else {
+        const previewText = text.length > 150 ? text.substring(0, 150) + '...' : text;
+        preview.innerHTML = `<p>${escapeHtml(previewText)}</p>`;
+      }
+    }
+
+    async function saveJournalEntry() {
+      const today = getTodayDate();
+      const journalText = document.getElementById('journal-modal-input').value;
+      const entry = await getEntry(today) || {};
+      await saveEntry(today, {
+        ...entry,
+        journal: journalText
+      });
+      updateJournalPreview(journalText);
     }
 
     async function loadHabitsChecklist(containerId, completions = {}) {
@@ -933,7 +1028,7 @@
       const today = getTodayDate();
       const mood = parseInt(document.getElementById('mood-input').value);
       const highlight = document.getElementById('highlight-input').value.trim();
-      const journal = document.getElementById('journal-input').value.trim();
+      const journal = document.getElementById('journal-modal-input')?.value.trim() || '';
       const screenTime = document.getElementById('screen-time-input').value.trim();
       const screenTimeNum = screenTime ? parseInt(screenTime) : null;
       const weight = document.getElementById('weight-input').value.trim();
@@ -987,9 +1082,12 @@
       }
 
       emptyState.style.display = 'none';
-      container.innerHTML = habits.map(habit => `
-        <div class="habit-item draggable" draggable="true" data-habit-id="${habit.id}">
-          <span class="drag-handle">☰</span>
+      container.innerHTML = habits.map((habit, index) => `
+        <div class="habit-item draggable" data-habit-id="${habit.id}" data-index="${index}">
+          <div class="drag-controls">
+            <button class="drag-up-btn" data-habit-id="${habit.id}" ${index === 0 ? 'disabled' : ''} title="Move up">↑</button>
+            <button class="drag-down-btn" data-habit-id="${habit.id}" ${index === habits.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+          </div>
           <span class="habit-name">${escapeHtml(habit.name)}</span>
           <div class="habit-actions">
             <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
@@ -998,13 +1096,18 @@
         </div>
       `).join('');
 
-      // Add drag and drop
-      setupDragAndDrop(container);
+      // Add up/down buttons for reordering
+      container.querySelectorAll('.drag-up-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const habitId = parseInt(btn.dataset.habitId);
+          await moveHabitUp(habitId);
+        });
+      });
       
-      // Save order when drag ends
-      container.querySelectorAll('.draggable').forEach(item => {
-        item.addEventListener('dragend', async () => {
-          await saveHabitOrder();
+      container.querySelectorAll('.drag-down-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const habitId = parseInt(btn.dataset.habitId);
+          await moveHabitDown(habitId);
         });
       });
 
@@ -1040,81 +1143,6 @@
       });
     }
 
-    function setupDragAndDrop(container) {
-      let draggedElement = null;
-
-      container.querySelectorAll('.draggable').forEach(item => {
-        const dragHandle = item.querySelector('.drag-handle');
-        
-        // Remove draggable from item itself
-        item.setAttribute('draggable', 'false');
-        
-        // Make the drag handle the draggable element
-        if (dragHandle) {
-          dragHandle.setAttribute('draggable', 'true');
-          
-          dragHandle.addEventListener('dragstart', (e) => {
-            draggedElement = item;
-            item.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.stopPropagation();
-          });
-
-          dragHandle.addEventListener('dragend', () => {
-            if (draggedElement) {
-              draggedElement.classList.remove('dragging');
-            }
-          });
-        }
-        
-        // Make the whole item a drop zone
-        item.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          
-          if (!draggedElement || draggedElement === item) return;
-          
-          const afterElement = getDragAfterElement(container, e.clientY);
-          if (afterElement == null) {
-            container.appendChild(draggedElement);
-          } else {
-            container.insertBefore(draggedElement, afterElement);
-          }
-        });
-        
-        item.addEventListener('drop', (e) => {
-          e.preventDefault();
-        });
-      });
-    }
-
-    function getDragAfterElement(container, y) {
-      const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
-      
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    // Save habit order after drag
-    async function saveHabitOrder() {
-      const habits = await getHabits();
-      const order = Array.from(document.querySelectorAll('#habits-list .draggable')).map(item => 
-        parseInt(item.dataset.habitId)
-      );
-      await setPreference('habitOrder', order);
-      // Reload history to update top 3
-      if (document.getElementById('history-tab').classList.contains('active')) {
-        await loadHistoryPage();
-      }
-    }
 
     async function handleAddHabit() {
       const input = document.getElementById('new-habit-input');
@@ -1557,7 +1585,7 @@
       document.getElementById('edit-mood-input').value = entry.mood || 5;
       document.getElementById('edit-mood-value').textContent = entry.mood || 5;
       document.getElementById('edit-highlight-input').value = entry.highlight || '';
-      document.getElementById('edit-journal-input').value = entry.journal || '';
+      updateEditJournalPreview(entry.journal || '');
       document.getElementById('edit-screen-time-input').value = entry.screenTime || '';
       
       // Add weight field to edit modal if preference is enabled
@@ -1587,7 +1615,7 @@
     async function saveEditEntry() {
       const mood = parseInt(document.getElementById('edit-mood-input').value);
       const highlight = document.getElementById('edit-highlight-input').value.trim();
-      const journal = document.getElementById('edit-journal-input').value.trim();
+      const journal = document.getElementById('journal-modal-input')?.value.trim() || '';
       const screenTime = document.getElementById('edit-screen-time-input').value.trim();
       const screenTimeNum = screenTime ? parseInt(screenTime) : null;
       const weightInput = document.getElementById('edit-weight-input');
