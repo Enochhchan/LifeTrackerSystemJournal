@@ -148,6 +148,41 @@ body {
   color: var(--text-primary);
 }
 
+.card-header-with-remove {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.card-header-with-remove label {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.remove-feature-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.remove-feature-btn:hover,
+.remove-feature-btn:active {
+  background: var(--background);
+  color: var(--danger);
+}
+
 .card h2 {
   font-size: 20px;
   font-weight: 600;
@@ -405,6 +440,35 @@ button {
   flex: 1;
 }
 
+.add-habit-inline-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--background);
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  transition: all 0.2s;
+}
+
+.add-habit-inline-btn:active {
+  background: var(--surface);
+  border-color: var(--primary-color);
+}
+
+.add-habit-inline-btn span {
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
+}
+
 /* Habits List */
 .add-habit-container {
   display: flex;
@@ -434,6 +498,33 @@ button {
 
 .habit-item:active {
   transform: scale(0.98);
+}
+
+.habit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.remove-habit-btn {
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.remove-habit-btn:active {
+  transform: scale(0.9);
+  opacity: 0.8;
 }
 
 .habit-name {

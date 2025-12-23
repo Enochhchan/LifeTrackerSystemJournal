@@ -362,7 +362,44 @@ async function getMoodTrend(days = 30) {
 function getJournalConsistency() {
   return getAllEntries().then(entries => {
     const journaled = entries.filter(e => e.journal && e.journal.trim().length > 0).length;
-    return { total: entries.length, journaled };
+    const total = entries.length;
+    const rate = total > 0 ? Math.round((journaled / total) * 100) : 0;
+    
+    // Calculate total word count
+    const totalWords = entries
+      .filter(e => e.journal && e.journal.trim().length > 0)
+      .reduce((sum, e) => {
+        const words = e.journal.trim().split(/\s+/).filter(w => w.length > 0);
+        return sum + words.length;
+      }, 0);
+    
+    // Calculate longest streak
+    const sortedEntries = entries
+      .filter(e => e.journal && e.journal.trim().length > 0)
+      .map(e => e.date)
+      .sort()
+      .reverse();
+    
+    let longestStreak = 0;
+    if (sortedEntries.length > 0) {
+      let currentStreak = 1;
+      longestStreak = 1;
+      
+      for (let i = 1; i < sortedEntries.length; i++) {
+        const prevDate = new Date(sortedEntries[i - 1] + 'T00:00:00');
+        const currDate = new Date(sortedEntries[i] + 'T00:00:00');
+        const diffDays = Math.floor((prevDate - currDate) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+          currentStreak++;
+          longestStreak = Math.max(longestStreak, currentStreak);
+        } else {
+          currentStreak = 1;
+        }
+      }
+    }
+    
+    return { total, journaled, rate, totalWords, longestStreak };
   });
 }
 

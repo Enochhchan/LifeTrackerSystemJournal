@@ -78,11 +78,17 @@
     </div>
 
     <div class="card" id="habits-card" style="display: none;">
-      <label>Habits</label>
+      <div class="card-header-with-remove">
+        <label>Habits</label>
+        <button class="remove-feature-btn" data-feature="habits" title="Remove Habits">×</button>
+      </div>
       <div id="habits-checklist"></div>
       <div class="empty-state" id="habits-empty" style="display: none;">
         <p>No habits yet. Tap + to add habits!</p>
       </div>
+      <button class="add-habit-inline-btn" id="add-habit-inline-btn">
+        <span>+</span> Add Habit
+      </button>
     </div>
 
     <div class="card">
@@ -91,7 +97,10 @@
     </div>
 
     <div class="card" id="screen-time-card" style="display: none;">
-      <label for="screen-time-input">Screen Time (minutes)</label>
+      <div class="card-header-with-remove">
+        <label for="screen-time-input">Screen Time (minutes)</label>
+        <button class="remove-feature-btn" data-feature="screen-time" title="Remove Screen Time">×</button>
+      </div>
       <div class="screen-time-container">
         <input type="number" id="screen-time-input" placeholder="Optional" min="0" />
         <button type="button" class="helper-btn" id="screen-time-help">How to find</button>
@@ -107,7 +116,10 @@
     </div>
 
     <div class="card" id="weight-card" style="display: none;">
-      <label for="weight-input">Weight (lbs)</label>
+      <div class="card-header-with-remove">
+        <label for="weight-input">Weight (lbs)</label>
+        <button class="remove-feature-btn" data-feature="weight" title="Remove Weight Tracker">×</button>
+      </div>
       <input type="number" id="weight-input" placeholder="Enter your weight" min="0" step="0.1" />
     </div>
 
@@ -548,12 +560,19 @@
         if (e.key === 'Enter') handleAddHabit();
       });
 
-      // Click on habits card to manage
-      document.getElementById('habits-card')?.addEventListener('click', (e) => {
-        if (e.target.closest('#habits-checklist') || e.target.closest('#habits-empty')) {
-          document.getElementById('manage-habits-modal').style.display = 'flex';
-          renderHabitsList();
-        }
+      // Add habit inline button
+      document.getElementById('add-habit-inline-btn').addEventListener('click', () => {
+        document.getElementById('manage-habits-modal').style.display = 'flex';
+        renderHabitsList();
+      });
+
+      // Remove feature buttons
+      document.querySelectorAll('.remove-feature-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const feature = btn.dataset.feature;
+          removeFeature(feature);
+        });
       });
 
       // History modals
@@ -683,6 +702,23 @@
       });
       document.getElementById('mood-prompt-modal').style.display = 'none';
       await loadTodayPage(); // Refresh today page
+    }
+
+    async function removeFeature(feature) {
+      if (confirm(`Remove ${feature === 'habits' ? 'Habits' : feature === 'weight' ? 'Weight Tracker' : 'Screen Time'}?`)) {
+        if (feature === 'habits') {
+          await setPreference('showHabits', false);
+          document.getElementById('habits-card').style.display = 'none';
+        } else if (feature === 'weight') {
+          await setPreference('showWeight', false);
+          document.getElementById('weight-card').style.display = 'none';
+          document.getElementById('pref-weight').checked = false;
+        } else if (feature === 'screen-time') {
+          await setPreference('showScreenTime', false);
+          document.getElementById('screen-time-card').style.display = 'none';
+          document.getElementById('pref-screen-time').checked = false;
+        }
+      }
     }
 
     // Initialize mood bars when modals open
@@ -879,7 +915,10 @@
       container.innerHTML = habits.map(habit => `
         <div class="habit-item">
           <span class="habit-name">${escapeHtml(habit.name)}</span>
-          <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
+          <div class="habit-actions">
+            <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
+            <button class="remove-habit-btn" data-habit-id="${habit.id}" title="Remove habit">×</button>
+          </div>
         </div>
       `).join('');
 
@@ -888,6 +927,29 @@
         btn.addEventListener('click', () => {
           const habitId = parseInt(btn.dataset.habitId);
           openHabitEditModal(habitId);
+        });
+      });
+
+      // Add remove listeners
+      document.querySelectorAll('.remove-habit-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const habitId = parseInt(btn.dataset.habitId);
+          if (confirm('Are you sure you want to remove this habit? This will remove it from all entries.')) {
+            try {
+              await deleteHabit(habitId);
+              await renderHabitsList();
+              // Reload today page if visible
+              if (document.getElementById('today-tab').classList.contains('active')) {
+                await loadTodayPage();
+              }
+              // Reload history if visible
+              if (document.getElementById('history-tab').classList.contains('active')) {
+                await loadHistoryPage();
+              }
+            } catch (error) {
+              alert('Failed to remove habit: ' + error.message);
+            }
+          }
         });
       });
     }
@@ -1125,7 +1187,6 @@
     async function renderJournalConsistency() {
       const consistency = await getJournalConsistency();
       const container = document.getElementById('journal-consistency');
-      const rate = consistency.total > 0 ? Math.round((consistency.journaled / consistency.total) * 100) : 0;
 
       container.innerHTML = `
         <div class="stat-row">
@@ -1134,7 +1195,15 @@
         </div>
         <div class="stat-row">
           <span>Consistency rate:</span>
-          <span>${rate}%</span>
+          <span>${consistency.rate}%</span>
+        </div>
+        <div class="stat-row">
+          <span>Total words:</span>
+          <span>${consistency.totalWords.toLocaleString()}</span>
+        </div>
+        <div class="stat-row">
+          <span>Longest streak:</span>
+          <span>${consistency.longestStreak} days</span>
         </div>
       `;
     }
