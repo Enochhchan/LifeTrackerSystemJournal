@@ -101,11 +101,11 @@
 
     <div class="card" id="screen-time-card" style="display: none;">
       <div class="card-header-with-remove">
-        <label for="screen-time-input">Screen Time (minutes)</label>
+        <label for="screen-time-input">Screen Time (hours minutes, e.g., "2 30" for 2h 30m)</label>
         <button class="remove-feature-btn" data-feature="screen-time" title="Remove Screen Time">×</button>
       </div>
       <div class="screen-time-container">
-        <input type="number" id="screen-time-input" placeholder="Optional" min="0" />
+        <input type="text" id="screen-time-input" placeholder="e.g., 2 30" />
         <button type="button" class="helper-btn" id="screen-time-help">How to find</button>
       </div>
       <div id="screen-time-instructions" class="helper-text" style="display: none;">
@@ -232,9 +232,14 @@
       <div id="journal-consistency"></div>
     </div>
 
-  <div class="card">
+    <div class="card">
       <h2>Most Consistent Habits</h2>
       <div id="most-consistent-habits"></div>
+    </div>
+
+    <div class="card">
+      <h2>Monthly Stats</h2>
+      <div id="monthly-stats-container"></div>
     </div>
   </div>
 
@@ -342,8 +347,8 @@
           <div id="edit-journal-preview" class="journal-preview"></div>
         </div>
         <div class="card">
-          <label for="edit-screen-time-input">Screen Time (minutes)</label>
-          <input type="number" id="edit-screen-time-input" min="0" />
+          <label for="edit-screen-time-input">Screen Time (hours minutes, e.g., "2 30" for 2h 30m)</label>
+          <input type="text" id="edit-screen-time-input" placeholder="e.g., 2 30" />
         </div>
         <button class="save-btn" id="save-edit-btn">Save Changes</button>
       </div>
@@ -919,7 +924,12 @@
         updateMoodBar('mood-bar', 'mood-bar-fill', entry.mood || 5);
         document.getElementById('highlight-input').value = entry.highlight || '';
         updateJournalPreview(entry.journal || '');
-        document.getElementById('screen-time-input').value = entry.screenTime || '';
+        const screenTimeMins = entry.screenTime || 0;
+        const screenTimeHours = Math.floor(screenTimeMins / 60);
+        const screenTimeRemainder = screenTimeMins % 60;
+        document.getElementById('screen-time-input').value = screenTimeMins > 0 
+          ? `${screenTimeHours} ${screenTimeRemainder}`
+          : '';
         document.getElementById('weight-input').value = entry.weight || '';
       } else {
         document.getElementById('mood-input').value = 5;
@@ -1166,6 +1176,53 @@
       });
     }
 
+    async function moveHabitUp(habitId) {
+      const habits = await getHabits();
+      const prefs = await getPreferences();
+      const order = prefs.habitOrder || habits.map(h => h.id);
+      
+      const currentIndex = order.indexOf(habitId);
+      if (currentIndex <= 0) return;
+      
+      // Swap with previous
+      [order[currentIndex - 1], order[currentIndex]] = [order[currentIndex], order[currentIndex - 1]];
+      
+      await setPreference('habitOrder', order);
+      await renderHabitsList();
+      
+      // Reload history if visible
+      if (document.getElementById('history-tab').classList.contains('active')) {
+        await loadHistoryPage();
+      }
+      // Reload today if visible
+      if (document.getElementById('today-tab').classList.contains('active')) {
+        await loadTodayPage();
+      }
+    }
+
+    async function moveHabitDown(habitId) {
+      const habits = await getHabits();
+      const prefs = await getPreferences();
+      const order = prefs.habitOrder || habits.map(h => h.id);
+      
+      const currentIndex = order.indexOf(habitId);
+      if (currentIndex >= order.length - 1) return;
+      
+      // Swap with next
+      [order[currentIndex], order[currentIndex + 1]] = [order[currentIndex + 1], order[currentIndex]];
+      
+      await setPreference('habitOrder', order);
+      await renderHabitsList();
+      
+      // Reload history if visible
+      if (document.getElementById('history-tab').classList.contains('active')) {
+        await loadHistoryPage();
+      }
+      // Reload today if visible
+      if (document.getElementById('today-tab').classList.contains('active')) {
+        await loadTodayPage();
+      }
+    }
 
     async function handleAddHabit() {
       const input = document.getElementById('new-habit-input');
@@ -1258,6 +1315,7 @@
       await renderWeightChart();
       await renderJournalConsistency();
       await renderMostConsistentHabits();
+      await renderMonthlyStats();
     }
 
     async function renderHabitStats() {
@@ -1571,7 +1629,13 @@
       document.getElementById('modal-mood').textContent = entry.mood ? `${entry.mood}/10` : 'Not set';
       document.getElementById('modal-highlight').textContent = entry.highlight || 'None';
       document.getElementById('modal-journal').textContent = entry.journal || 'No journal entry';
-      document.getElementById('modal-screen-time').textContent = entry.screenTime ? `${entry.screenTime} minutes` : 'Not set';
+      const screenTimeMins = entry.screenTime || 0;
+      const screenTimeHours = Math.floor(screenTimeMins / 60);
+      const screenTimeRemainder = screenTimeMins % 60;
+      const screenTimeText = screenTimeMins > 0 
+        ? `${screenTimeHours}h ${screenTimeRemainder}m`
+        : 'Not set';
+      document.getElementById('modal-screen-time').textContent = screenTimeText;
       
       // Add weight to modal if it exists
       const modalBody = document.querySelector('#history-modal .modal-body');
@@ -1609,7 +1673,12 @@
       document.getElementById('edit-mood-value').textContent = entry.mood || 5;
       document.getElementById('edit-highlight-input').value = entry.highlight || '';
       updateEditJournalPreview(entry.journal || '');
-      document.getElementById('edit-screen-time-input').value = entry.screenTime || '';
+      const screenTimeMins = entry.screenTime || 0;
+      const screenTimeHours = Math.floor(screenTimeMins / 60);
+      const screenTimeRemainder = screenTimeMins % 60;
+      document.getElementById('edit-screen-time-input').value = screenTimeMins > 0 
+        ? `${screenTimeHours} ${screenTimeRemainder}`
+        : '';
       
       // Add weight field to edit modal if preference is enabled
       const prefs = await getPreferences();
@@ -1640,7 +1709,19 @@
       const highlight = document.getElementById('edit-highlight-input').value.trim();
       const journal = document.getElementById('journal-modal-input')?.value.trim() || '';
       const screenTime = document.getElementById('edit-screen-time-input').value.trim();
-      const screenTimeNum = screenTime ? parseInt(screenTime) : null;
+      // Convert hours and minutes to total minutes
+      let screenTimeNum = null;
+      if (screenTime) {
+        // Check if format is "H M" or just minutes
+        const parts = screenTime.split(' ');
+        if (parts.length === 2) {
+          const hours = parseInt(parts[0]) || 0;
+          const mins = parseInt(parts[1]) || 0;
+          screenTimeNum = hours * 60 + mins;
+        } else {
+          screenTimeNum = parseInt(screenTime);
+        }
+      }
       const weightInput = document.getElementById('edit-weight-input');
       const weight = weightInput ? weightInput.value.trim() : '';
       const weightNum = weight ? parseFloat(weight) : null;
