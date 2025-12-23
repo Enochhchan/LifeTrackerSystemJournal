@@ -190,7 +190,9 @@ async function getPreferences() {
         showHabits: false,
         promptMoodOnOpen: true,
         userName: '',
-        topHabits: [null, null, null]
+        topHabits: [null, null, null],
+        theme: 'light',
+        habitOrder: []
       };
       resolve({ ...defaults, ...prefs });
     };

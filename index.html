@@ -174,12 +174,28 @@
         <button class="close-btn" id="close-manage-habits-modal">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="card">
-          <div class="add-habit-container">
-            <input type="text" id="new-habit-input" placeholder="Enter habit name" />
-            <button class="add-btn" id="add-habit-btn">Add</button>
+      <div class="card">
+        <div class="add-habit-container">
+          <input type="text" id="new-habit-input" placeholder="Enter habit name" maxlength="20" />
+          <button class="add-btn" id="add-habit-btn">Add</button>
+        </div>
+        <div class="habit-suggestions">
+          <span class="suggestions-label">Suggestions:</span>
+          <div class="suggestion-chips">
+            <button class="suggestion-chip" data-habit="Exercise">Exercise</button>
+            <button class="suggestion-chip" data-habit="Read">Read</button>
+            <button class="suggestion-chip" data-habit="Meditate">Meditate</button>
+            <button class="suggestion-chip" data-habit="Water">Water</button>
+            <button class="suggestion-chip" data-habit="Sleep">Sleep</button>
+            <button class="suggestion-chip" data-habit="Journal">Journal</button>
+            <button class="suggestion-chip" data-habit="Walk">Walk</button>
+            <button class="suggestion-chip" data-habit="Yoga">Yoga</button>
           </div>
         </div>
+        <div class="char-count">
+          <span id="habit-char-count">0</span>/20
+        </div>
+      </div>
         <div id="habits-list" class="habits-list"></div>
         <div class="empty-state" id="habits-list-empty" style="display: none;">
           <p>No habits yet. Add your first habit above!</p>
@@ -195,8 +211,11 @@
     </div>
 
     <div class="card">
-      <h2>Habit Completion</h2>
-      <div id="habit-stats-container"></div>
+      <div class="collapsible-header" id="habit-stats-header">
+        <h2>Habit Completion</h2>
+        <span class="collapse-icon">▼</span>
+      </div>
+      <div id="habit-stats-container" class="collapsible-content"></div>
     </div>
 
     <div class="card">
@@ -233,6 +252,13 @@
       <button class="save-btn" id="save-top-habits-btn" style="margin-top: 12px;">Save</button>
     </div>
 
+    <div class="history-header">
+      <div class="history-header-col date-col">DATE</div>
+      <div class="history-header-col mood-col">MOOD</div>
+      <div class="history-header-col habit-col" id="history-habit-1">-</div>
+      <div class="history-header-col habit-col" id="history-habit-2">-</div>
+      <div class="history-header-col habit-col" id="history-habit-3">-</div>
+    </div>
     <div id="history-list" class="history-list-compact"></div>
     <div class="empty-state" id="history-empty" style="display: none;">
       <p>No entries yet. Start by adding your first entry in the Today tab!</p>
@@ -373,6 +399,20 @@
   </div>
 
     <div class="card">
+      <h2>Appearance</h2>
+      <div class="preference-item">
+        <label class="switch">
+          <input type="checkbox" id="pref-theme" />
+          <span class="slider"></span>
+        </label>
+        <div class="preference-label">
+          <span class="preference-title">Dark Mode</span>
+          <span class="preference-desc">Toggle between light and dark theme</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Preferences</h2>
       <div class="preference-item">
         <label class="switch">
@@ -483,8 +523,14 @@
       document.getElementById('pref-mood-prompt').checked = prefs.promptMoodOnOpen;
       document.getElementById('settings-name-input').value = prefs.userName || '';
       
-      // Load top habits
-      topHabits = prefs.topHabits || [null, null, null];
+      // Set theme
+      const theme = prefs.theme || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('pref-theme').checked = theme === 'dark';
+      
+      // Load top habits (from order, first 3)
+      const habits = await getHabits();
+      topHabits = habits.slice(0, 3).map(h => h.id);
     }
 
     async function updateWelcomeTitle() {
@@ -558,6 +604,34 @@
       document.getElementById('add-habit-btn').addEventListener('click', handleAddHabit);
       document.getElementById('new-habit-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleAddHabit();
+      });
+      document.getElementById('new-habit-input').addEventListener('input', (e) => {
+        const count = e.target.value.length;
+        document.getElementById('habit-char-count').textContent = count;
+      });
+      
+      // Habit suggestions
+      document.querySelectorAll('.suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const habit = chip.dataset.habit;
+          document.getElementById('new-habit-input').value = habit;
+          document.getElementById('habit-char-count').textContent = habit.length;
+        });
+      });
+
+      // Collapsible habit stats
+      document.getElementById('habit-stats-header').addEventListener('click', () => {
+        const container = document.getElementById('habit-stats-container');
+        const icon = document.querySelector('#habit-stats-header .collapse-icon');
+        container.classList.toggle('collapsed');
+        icon.classList.toggle('rotated');
+      });
+
+      // Theme toggle
+      document.getElementById('pref-theme').addEventListener('change', (e) => {
+        const isDark = e.target.checked;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        setPreference('theme', isDark ? 'dark' : 'light');
       });
 
       // Add habit inline button
@@ -913,7 +987,8 @@
 
       emptyState.style.display = 'none';
       container.innerHTML = habits.map(habit => `
-        <div class="habit-item">
+        <div class="habit-item draggable" draggable="true" data-habit-id="${habit.id}">
+          <span class="drag-handle">☰</span>
           <span class="habit-name">${escapeHtml(habit.name)}</span>
           <div class="habit-actions">
             <button class="edit-habit-btn" data-habit-id="${habit.id}">Edit</button>
@@ -921,6 +996,16 @@
           </div>
         </div>
       `).join('');
+
+      // Add drag and drop
+      setupDragAndDrop(container);
+      
+      // Save order when drag ends
+      container.querySelectorAll('.draggable').forEach(item => {
+        item.addEventListener('dragend', async () => {
+          await saveHabitOrder();
+        });
+      });
 
       // Add edit listeners
       document.querySelectorAll('.edit-habit-btn').forEach(btn => {
@@ -952,6 +1037,61 @@
           }
         });
       });
+    }
+
+    function setupDragAndDrop(container) {
+      let draggedElement = null;
+
+      container.querySelectorAll('.draggable').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          draggedElement = item;
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const afterElement = getDragAfterElement(container, e.clientY);
+          if (afterElement == null) {
+            container.appendChild(draggedElement);
+          } else {
+            container.insertBefore(draggedElement, afterElement);
+          }
+        });
+      });
+    }
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+      
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Save habit order after drag
+    async function saveHabitOrder() {
+      const habits = await getHabits();
+      const order = Array.from(document.querySelectorAll('#habits-list .draggable')).map(item => 
+        parseInt(item.dataset.habitId)
+      );
+      await setPreference('habitOrder', order);
+      // Reload history to update top 3
+      if (document.getElementById('history-tab').classList.contains('active')) {
+        await loadHistoryPage();
+      }
     }
 
     async function handleAddHabit() {
@@ -1042,8 +1182,12 @@
 
       if (habits.length === 0) {
         container.innerHTML = '<p>No habits to display stats for.</p>';
+        container.classList.add('collapsed');
         return;
       }
+      
+      // Start collapsed
+      container.classList.add('collapsed');
 
       const statsHtml = await Promise.all(habits.map(async (habit) => {
         const stats7d = await calculateHabitStats(habit.id, 7);
@@ -1079,6 +1223,9 @@
       }));
 
       container.innerHTML = statsHtml.join('');
+      
+      // Initially collapse
+      container.classList.add('collapsed');
     }
 
     async function renderMoodChart() {
@@ -1240,9 +1387,15 @@
       emptyState.style.display = 'none';
       const sortedEntries = entries.sort((a, b) => b.date.localeCompare(a.date));
       
-      // Load top habits
-      const prefs = await getPreferences();
-      topHabits = prefs.topHabits || [null, null, null];
+      // Load top habits (first 3 from ordered list)
+      const habits = await getHabits();
+      const orderedHabits = habits.slice(0, 3);
+      topHabits = orderedHabits.map(h => h.id);
+
+      // Update header with habit names
+      document.getElementById('history-habit-1').textContent = orderedHabits[0]?.name || '-';
+      document.getElementById('history-habit-2').textContent = orderedHabits[1]?.name || '-';
+      document.getElementById('history-habit-3').textContent = orderedHabits[2]?.name || '-';
 
       container.innerHTML = sortedEntries.map(entry => {
         const completions = entry.habitCompletions || {};
