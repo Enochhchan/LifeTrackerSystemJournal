@@ -509,6 +509,37 @@
 
     // Track last known date to detect day changes
     let lastKnownDate = null;
+    let dateCheckInterval = null;
+
+    // Check if date has changed and update if needed
+    async function checkDateChange() {
+      const currentDate = getTodayDate();
+      // Initialize if first check
+      if (!lastKnownDate) {
+        lastKnownDate = currentDate;
+        return;
+      }
+      
+      if (currentDate !== lastKnownDate) {
+        // Day has changed
+        console.log(`Date changed from ${lastKnownDate} to ${currentDate}`);
+        lastKnownDate = currentDate;
+        // Reload today page if it's active
+        if (document.getElementById('today-tab').classList.contains('active')) {
+          await loadTodayPage();
+          await checkMoodPrompt();
+        }
+        // Reload history if it's active
+        if (document.getElementById('history-tab').classList.contains('active')) {
+          await loadHistoryPage();
+          await loadCalendar();
+        }
+        // Reload stats if it's active
+        if (document.getElementById('stats-tab').classList.contains('active')) {
+          await loadStatsPage();
+        }
+      }
+    }
 
     // Initialize app
     async function init() {
@@ -525,25 +556,22 @@
         await checkMoodPrompt();
         
         // Check for day change when page becomes visible
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', handleVisibilityChange);
+        document.addEventListener('visibilitychange', async () => {
+          if (!document.hidden) {
+            await checkDateChange();
+          }
+        });
+        window.addEventListener('focus', checkDateChange);
+        
+        // Check for date change every 30 seconds (in case user is actively using the app at midnight)
+        dateCheckInterval = setInterval(checkDateChange, 30000);
+        
+        // Also check on any user interaction (click, touch, etc.)
+        document.addEventListener('click', checkDateChange, true);
+        document.addEventListener('touchstart', checkDateChange, true);
       } catch (error) {
         console.error('Initialization error:', error);
         alert('Failed to initialize app: ' + error.message);
-      }
-    }
-
-    async function handleVisibilityChange() {
-      if (!document.hidden) {
-        const currentDate = getTodayDate();
-        if (lastKnownDate && currentDate !== lastKnownDate) {
-          // Day has changed, reload the today page
-          lastKnownDate = currentDate;
-          if (document.getElementById('today-tab').classList.contains('active')) {
-            await loadTodayPage();
-            await checkMoodPrompt();
-          }
-        }
       }
     }
 
@@ -903,7 +931,7 @@
       observer.observe(moodPromptModal, { attributes: true });
     }
 
-    function switchTab(tabName) {
+    async function switchTab(tabName) {
       // Hide all tabs
       document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
@@ -922,11 +950,7 @@
 
       // Load tab-specific content
       if (tabName === 'today') {
-        // Check if day has changed
-        const currentDate = getTodayDate();
-        if (lastKnownDate && currentDate !== lastKnownDate) {
-          lastKnownDate = currentDate;
-        }
+        await checkDateChange();
         loadTodayPage();
       } else if (tabName === 'stats') {
         loadStatsPage();
@@ -943,6 +967,8 @@
 
     // Today page
     async function loadTodayPage() {
+      // Check if date has changed first
+      await checkDateChange();
       const today = getTodayDate();
       document.getElementById('today-date').textContent = formatDate(today);
 
