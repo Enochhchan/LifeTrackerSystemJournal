@@ -187,8 +187,10 @@ async function getPreferences() {
       const defaults = {
         showScreenTime: false,
         showWeight: false,
+        showHabits: false,
         promptMoodOnOpen: true,
-        userName: ''
+        userName: '',
+        topHabits: [null, null, null]
       };
       resolve({ ...defaults, ...prefs });
     };

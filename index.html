@@ -36,20 +36,13 @@
       </div>
       <div class="modal-body">
         <div class="mood-prompt-container">
-          <div class="mood-emoji-grid">
-            <button class="mood-emoji-btn" data-mood="1">😢</button>
-            <button class="mood-emoji-btn" data-mood="2">😞</button>
-            <button class="mood-emoji-btn" data-mood="3">😐</button>
-            <button class="mood-emoji-btn" data-mood="4">🙂</button>
-            <button class="mood-emoji-btn" data-mood="5">😊</button>
-            <button class="mood-emoji-btn" data-mood="6">😄</button>
-            <button class="mood-emoji-btn" data-mood="7">😁</button>
-            <button class="mood-emoji-btn" data-mood="8">🤩</button>
-            <button class="mood-emoji-btn" data-mood="9">🥳</button>
-            <button class="mood-emoji-btn" data-mood="10">🤗</button>
-          </div>
           <div class="mood-slider-container">
-            <input type="range" id="mood-prompt-input" min="1" max="10" value="5" />
+            <div class="mood-bar-container">
+              <div class="mood-bar" id="mood-prompt-bar">
+                <div class="mood-bar-fill" id="mood-prompt-bar-fill"></div>
+              </div>
+              <input type="range" id="mood-prompt-input" min="1" max="10" value="5" />
+            </div>
             <div class="mood-value-large" id="mood-prompt-value">5</div>
           </div>
           <button class="save-btn" id="save-mood-prompt-btn">Save Mood</button>
@@ -69,7 +62,12 @@
     <div class="card">
       <label for="mood-input">Mood (1-10)</label>
       <div class="mood-container">
-        <input type="range" id="mood-input" min="1" max="10" value="5" />
+        <div class="mood-bar-container">
+          <div class="mood-bar" id="mood-bar">
+            <div class="mood-bar-fill" id="mood-bar-fill"></div>
+          </div>
+          <input type="range" id="mood-input" min="1" max="10" value="5" />
+        </div>
         <div class="mood-value" id="mood-value">5</div>
       </div>
     </div>
@@ -79,11 +77,11 @@
       <input type="text" id="highlight-input" placeholder="What made today special?" />
     </div>
 
-    <div class="card">
+    <div class="card" id="habits-card" style="display: none;">
       <label>Habits</label>
       <div id="habits-checklist"></div>
       <div class="empty-state" id="habits-empty" style="display: none;">
-        <p>No habits yet. Add some in the Habits tab!</p>
+        <p>No habits yet. Tap + to add habits!</p>
       </div>
     </div>
 
@@ -113,26 +111,68 @@
       <input type="number" id="weight-input" placeholder="Enter your weight" min="0" step="0.1" />
     </div>
 
-    <button class="save-btn" id="save-today-btn">Save Entry</button>
+    <button class="add-feature-btn" id="add-feature-btn">
+      <span class="add-icon">+</span>
+      <span>Add Feature</span>
+    </button>
+
     <div id="save-status" class="save-status"></div>
   </div>
 
-  <!-- Habits Tab -->
-  <div id="habits-tab" class="tab-content">
-    <div class="page-header">
-      <h1>Habits</h1>
-    </div>
-
-    <div class="card">
-      <div class="add-habit-container">
-        <input type="text" id="new-habit-input" placeholder="Enter habit name" />
-        <button class="add-btn" id="add-habit-btn">Add</button>
+  <!-- Add Feature Modal -->
+  <div id="add-feature-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add Feature</h2>
+        <button class="close-btn" id="close-add-feature-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="feature-options">
+          <button class="feature-option-btn" id="add-habits-feature">
+            <span class="feature-icon">✓</span>
+            <div>
+              <div class="feature-title">Habits</div>
+              <div class="feature-desc">Track daily habits</div>
+            </div>
+          </button>
+          <button class="feature-option-btn" id="add-weight-feature">
+            <span class="feature-icon">⚖️</span>
+            <div>
+              <div class="feature-title">Weight Tracker</div>
+              <div class="feature-desc">Track your weight</div>
+            </div>
+          </button>
+          <button class="feature-option-btn" id="add-screen-time-feature">
+            <span class="feature-icon">📱</span>
+            <div>
+              <div class="feature-title">Screen Time</div>
+              <div class="feature-desc">Track daily screen time</div>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div id="habits-list" class="habits-list"></div>
-    <div class="empty-state" id="habits-list-empty" style="display: none;">
-      <p>No habits yet. Add your first habit above!</p>
+  <!-- Manage Habits Modal -->
+  <div id="manage-habits-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Manage Habits</h2>
+        <button class="close-btn" id="close-manage-habits-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card">
+          <div class="add-habit-container">
+            <input type="text" id="new-habit-input" placeholder="Enter habit name" />
+            <button class="add-btn" id="add-habit-btn">Add</button>
+          </div>
+        </div>
+        <div id="habits-list" class="habits-list"></div>
+        <div class="empty-state" id="habits-list-empty" style="display: none;">
+          <p>No habits yet. Add your first habit above!</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -172,11 +212,18 @@
   <div id="history-tab" class="tab-content">
     <div class="page-header">
       <h1>History</h1>
+      <button class="settings-icon-btn" id="top-habits-settings-btn" title="Set Top 3 Habits">⚙️</button>
     </div>
 
-    <div id="history-list" class="history-list"></div>
+    <div class="card" id="top-habits-settings-card" style="display: none;">
+      <h3>Select Top 3 Habits for History View</h3>
+      <div id="top-habits-selection"></div>
+      <button class="save-btn" id="save-top-habits-btn" style="margin-top: 12px;">Save</button>
+    </div>
+
+    <div id="history-list" class="history-list-compact"></div>
     <div class="empty-state" id="history-empty" style="display: none;">
-      <p>No entries yet. Start by saving your first entry in the Today tab!</p>
+      <p>No entries yet. Start by adding your first entry in the Today tab!</p>
     </div>
   </div>
 
@@ -272,10 +319,6 @@
     <button class="tab-btn active" data-tab="today">
       <span class="tab-icon">📅</span>
       <span class="tab-label">Today</span>
-    </button>
-    <button class="tab-btn" data-tab="habits">
-      <span class="tab-icon">✓</span>
-      <span class="tab-label">Habits</span>
     </button>
     <button class="tab-btn" data-tab="stats">
       <span class="tab-icon">📊</span>
@@ -374,6 +417,8 @@
     let moodChart = null;
     let weightChart = null;
     let userPreferences = null;
+    let saveTimeout = null;
+    let topHabits = [null, null, null]; // Top 3 habits for history view
 
     // Initialize app
     async function init() {
@@ -418,12 +463,16 @@
       // Update UI based on preferences
       document.getElementById('screen-time-card').style.display = prefs.showScreenTime ? 'block' : 'none';
       document.getElementById('weight-card').style.display = prefs.showWeight ? 'block' : 'none';
+      document.getElementById('habits-card').style.display = prefs.showHabits ? 'block' : 'none';
       
       // Update settings checkboxes
       document.getElementById('pref-screen-time').checked = prefs.showScreenTime;
       document.getElementById('pref-weight').checked = prefs.showWeight;
       document.getElementById('pref-mood-prompt').checked = prefs.promptMoodOnOpen;
       document.getElementById('settings-name-input').value = prefs.userName || '';
+      
+      // Load top habits
+      topHabits = prefs.topHabits || [null, null, null];
     }
 
     async function updateWelcomeTitle() {
@@ -448,18 +497,63 @@
 
       // Today page
       document.getElementById('mood-input').addEventListener('input', (e) => {
-        document.getElementById('mood-value').textContent = e.target.value;
+        const value = e.target.value;
+        document.getElementById('mood-value').textContent = value;
+        updateMoodBar('mood-bar', 'mood-bar-fill', value);
+        debounceSave();
       });
-      document.getElementById('save-today-btn').addEventListener('click', saveTodayEntry);
+      document.getElementById('highlight-input').addEventListener('input', debounceSave);
+      document.getElementById('journal-input').addEventListener('input', debounceSave);
+      document.getElementById('screen-time-input').addEventListener('input', debounceSave);
+      document.getElementById('weight-input').addEventListener('input', debounceSave);
       document.getElementById('screen-time-help').addEventListener('click', () => {
         const instructions = document.getElementById('screen-time-instructions');
         instructions.style.display = instructions.style.display === 'none' ? 'block' : 'none';
       });
 
-      // Habits page
+      // Add feature button
+      document.getElementById('add-feature-btn').addEventListener('click', () => {
+        document.getElementById('add-feature-modal').style.display = 'flex';
+      });
+      document.getElementById('close-add-feature-modal').addEventListener('click', () => {
+        document.getElementById('add-feature-modal').style.display = 'none';
+      });
+      document.getElementById('add-habits-feature').addEventListener('click', () => {
+        document.getElementById('add-feature-modal').style.display = 'none';
+        document.getElementById('habits-card').style.display = 'block';
+        setPreference('showHabits', true);
+        loadTodayPage();
+      });
+      document.getElementById('add-weight-feature').addEventListener('click', () => {
+        document.getElementById('add-feature-modal').style.display = 'none';
+        document.getElementById('weight-card').style.display = 'block';
+        setPreference('showWeight', true);
+        document.getElementById('pref-weight').checked = true;
+      });
+      document.getElementById('add-screen-time-feature').addEventListener('click', () => {
+        document.getElementById('add-feature-modal').style.display = 'none';
+        document.getElementById('screen-time-card').style.display = 'block';
+        setPreference('showScreenTime', true);
+        document.getElementById('pref-screen-time').checked = true;
+      });
+
+      // Manage habits
+      document.getElementById('close-manage-habits-modal').addEventListener('click', () => {
+        document.getElementById('manage-habits-modal').style.display = 'none';
+      });
+
+      // Habits management (in modal)
       document.getElementById('add-habit-btn').addEventListener('click', handleAddHabit);
       document.getElementById('new-habit-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleAddHabit();
+      });
+
+      // Click on habits card to manage
+      document.getElementById('habits-card')?.addEventListener('click', (e) => {
+        if (e.target.closest('#habits-checklist') || e.target.closest('#habits-empty')) {
+          document.getElementById('manage-habits-modal').style.display = 'flex';
+          renderHabitsList();
+        }
       });
 
       // History modals
@@ -492,19 +586,30 @@
 
       // Mood prompt modal
       document.getElementById('mood-prompt-input').addEventListener('input', (e) => {
-        document.getElementById('mood-prompt-value').textContent = e.target.value;
+        const value = e.target.value;
+        document.getElementById('mood-prompt-value').textContent = value;
+        updateMoodBar('mood-prompt-bar', 'mood-prompt-bar-fill', value);
       });
-      document.querySelectorAll('.mood-emoji-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const mood = parseInt(btn.dataset.mood);
-          document.getElementById('mood-prompt-input').value = mood;
-          document.getElementById('mood-prompt-value').textContent = mood;
-        });
-      });
+      
+      // Initialize mood prompt bar on open
+      const moodPromptInput = document.getElementById('mood-prompt-input');
+      if (moodPromptInput) {
+        updateMoodBar('mood-prompt-bar', 'mood-prompt-bar-fill', moodPromptInput.value);
+      }
       document.getElementById('save-mood-prompt-btn').addEventListener('click', saveMoodPrompt);
       document.getElementById('skip-mood-btn').addEventListener('click', () => {
         document.getElementById('mood-prompt-modal').style.display = 'none';
       });
+
+      // Top habits settings
+      document.getElementById('top-habits-settings-btn').addEventListener('click', () => {
+        const card = document.getElementById('top-habits-settings-card');
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        if (card.style.display === 'block') {
+          loadTopHabitsSelection();
+        }
+      });
+      document.getElementById('save-top-habits-btn').addEventListener('click', saveTopHabits);
 
       // Settings
       document.getElementById('export-btn').addEventListener('click', handleExportData);
@@ -580,6 +685,23 @@
       await loadTodayPage(); // Refresh today page
     }
 
+    // Initialize mood bars when modals open
+    const moodPromptModal = document.getElementById('mood-prompt-modal');
+    if (moodPromptModal) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            const isVisible = moodPromptModal.style.display === 'flex';
+            if (isVisible) {
+              const value = document.getElementById('mood-prompt-input').value;
+              updateMoodBar('mood-prompt-bar', 'mood-prompt-bar-fill', value);
+            }
+          }
+        });
+      });
+      observer.observe(moodPromptModal, { attributes: true });
+    }
+
     function switchTab(tabName) {
       // Hide all tabs
       document.querySelectorAll('.tab-content').forEach(tab => {
@@ -600,8 +722,6 @@
       // Load tab-specific content
       if (tabName === 'today') {
         loadTodayPage();
-      } else if (tabName === 'habits') {
-        loadHabitsPage();
       } else if (tabName === 'stats') {
         loadStatsPage();
       } else if (tabName === 'history') {
@@ -621,9 +741,12 @@
 
       // Load existing entry
       const entry = await getEntry(today);
+      const prefs = await getPreferences();
+      
       if (entry) {
         document.getElementById('mood-input').value = entry.mood || 5;
         document.getElementById('mood-value').textContent = entry.mood || 5;
+        updateMoodBar('mood-bar', 'mood-bar-fill', entry.mood || 5);
         document.getElementById('highlight-input').value = entry.highlight || '';
         document.getElementById('journal-input').value = entry.journal || '';
         document.getElementById('screen-time-input').value = entry.screenTime || '';
@@ -631,14 +754,37 @@
       } else {
         document.getElementById('mood-input').value = 5;
         document.getElementById('mood-value').textContent = '5';
+        updateMoodBar('mood-bar', 'mood-bar-fill', 5);
         document.getElementById('highlight-input').value = '';
         document.getElementById('journal-input').value = '';
         document.getElementById('screen-time-input').value = '';
         document.getElementById('weight-input').value = '';
       }
 
-      // Load habits checklist
-      await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+      // Show habits card if enabled
+      if (prefs.showHabits) {
+        document.getElementById('habits-card').style.display = 'block';
+        await loadHabitsChecklist('habits-checklist', entry?.habitCompletions || {});
+      } else {
+        document.getElementById('habits-card').style.display = 'none';
+      }
+    }
+
+    function updateMoodBar(barId, fillId, value) {
+      const percentage = ((value - 1) / 9) * 100;
+      const fill = document.getElementById(fillId);
+      if (fill) {
+        fill.style.width = percentage + '%';
+      }
+    }
+
+    function debounceSave() {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+      saveTimeout = setTimeout(() => {
+        saveTodayEntry();
+      }, 1000); // Auto-save after 1 second of no input
     }
 
     async function loadHabitsChecklist(containerId, completions = {}) {
@@ -663,6 +809,13 @@
           <span>${escapeHtml(habit.name)}</span>
         </label>
       `).join('');
+
+      // Add auto-save to checkboxes if this is the main checklist
+      if (containerId === 'habits-checklist') {
+        container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+          checkbox.addEventListener('change', debounceSave);
+        });
+      }
     }
 
     async function saveTodayEntry() {
@@ -692,21 +845,24 @@
         });
 
         const statusEl = document.getElementById('save-status');
-        statusEl.textContent = 'Saved!';
+        statusEl.textContent = 'Saved';
         statusEl.className = 'save-status success';
         setTimeout(() => {
           statusEl.textContent = '';
           statusEl.className = 'save-status';
-        }, 2000);
+        }, 1500);
       } catch (error) {
-        alert('Failed to save entry: ' + error.message);
+        console.error('Failed to save entry:', error);
+        const statusEl = document.getElementById('save-status');
+        statusEl.textContent = 'Save failed';
+        statusEl.className = 'save-status error';
+        setTimeout(() => {
+          statusEl.textContent = '';
+          statusEl.className = 'save-status';
+        }, 2000);
       }
     }
 
-    // Habits page
-    async function loadHabitsPage() {
-      await renderHabitsList();
-    }
 
     async function renderHabitsList() {
       const container = document.getElementById('habits-list');
@@ -1014,24 +1170,78 @@
 
       emptyState.style.display = 'none';
       const sortedEntries = entries.sort((a, b) => b.date.localeCompare(a.date));
+      
+      // Load top habits
+      const prefs = await getPreferences();
+      topHabits = prefs.topHabits || [null, null, null];
 
-      container.innerHTML = sortedEntries.map(entry => `
-        <div class="history-item" data-date="${entry.date}">
-          <div class="history-item-header">
-            <span class="history-date">${formatDateShort(entry.date)}</span>
-            ${entry.mood ? `<span class="history-mood">Mood: ${entry.mood}/10</span>` : ''}
+      container.innerHTML = sortedEntries.map(entry => {
+        const completions = entry.habitCompletions || {};
+        const habitBoxes = topHabits.map((habitId, index) => {
+          if (!habitId) return '<div class="habit-box empty">-</div>';
+          const completed = completions[habitId];
+          return `<div class="habit-box ${completed ? 'completed' : ''}">${completed ? '✓' : ''}</div>`;
+        }).join('');
+
+        return `
+          <div class="history-row" data-date="${entry.date}">
+            <div class="history-date-col">${formatDateShort(entry.date)}</div>
+            <div class="history-mood-col">${entry.mood ? `${entry.mood}/10` : '-'}</div>
+            <div class="history-habits-col">${habitBoxes}</div>
           </div>
-          ${entry.highlight ? `<div class="history-highlight">${escapeHtml(entry.highlight)}</div>` : ''}
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       // Add click listeners
-      document.querySelectorAll('.history-item').forEach(item => {
+      document.querySelectorAll('.history-row').forEach(item => {
         item.addEventListener('click', () => {
           const date = item.dataset.date;
           openHistoryModal(date);
         });
       });
+    }
+
+    async function loadTopHabitsSelection() {
+      const habits = await getHabits();
+      const prefs = await getPreferences();
+      const selected = prefs.topHabits || [null, null, null];
+      const container = document.getElementById('top-habits-selection');
+
+      if (habits.length === 0) {
+        container.innerHTML = '<p>No habits available. Add habits first!</p>';
+        return;
+      }
+
+      container.innerHTML = [0, 1, 2].map(index => {
+        const selectedId = selected[index];
+        const selectedHabit = habits.find(h => h.id === selectedId);
+        
+        return `
+          <div class="top-habit-selector">
+            <label>Habit ${index + 1}:</label>
+            <select class="top-habit-select" data-index="${index}">
+              <option value="">None</option>
+              ${habits.map(h => `
+                <option value="${h.id}" ${h.id === selectedId ? 'selected' : ''}>${escapeHtml(h.name)}</option>
+              `).join('')}
+            </select>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('.top-habit-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const index = parseInt(e.target.dataset.index);
+          const habitId = e.target.value ? parseInt(e.target.value) : null;
+          topHabits[index] = habitId;
+        });
+      });
+    }
+
+    async function saveTopHabits() {
+      await setPreference('topHabits', topHabits);
+      document.getElementById('top-habits-settings-card').style.display = 'none';
+      await loadHistoryPage();
     }
 
     async function openHistoryModal(date) {
