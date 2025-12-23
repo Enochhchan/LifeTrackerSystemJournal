@@ -269,76 +269,90 @@ async function importData(json) {
   });
 
   // Import habits - use a single transaction for all habits
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_HABITS], 'readwrite');
-    const store = transaction.objectStore(STORE_HABITS);
-    let completed = 0;
-    let hasError = false;
+  if (json.habits.length > 0) {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_HABITS], 'readwrite');
+      const store = transaction.objectStore(STORE_HABITS);
+      let completed = 0;
+      let hasError = false;
+      const total = json.habits.length;
 
-    if (json.habits.length === 0) {
-      resolve();
-      return;
-    }
-
-    for (const habit of json.habits) {
-      const request = store.add(habit);
-      request.onsuccess = () => {
-        completed++;
-        if (completed === json.habits.length && !hasError) {
-          resolve();
+      // Queue all operations immediately (don't await between them)
+      // Remove 'id' field since we're using autoIncrement
+      json.habits.forEach((habit) => {
+        try {
+          const habitToAdd = { name: habit.name, createdAt: habit.createdAt || new Date().toISOString() };
+          const request = store.add(habitToAdd);
+          request.onsuccess = () => {
+            completed++;
+            if (completed === total && !hasError) {
+              resolve();
+            }
+          };
+          request.onerror = () => {
+            if (!hasError) {
+              hasError = true;
+              reject(request.error);
+            }
+          };
+        } catch (error) {
+          if (!hasError) {
+            hasError = true;
+            reject(error);
+          }
         }
-      };
-      request.onerror = () => {
+      });
+
+      transaction.onerror = (event) => {
         if (!hasError) {
           hasError = true;
-          reject(request.error);
+          reject(event.target.error || transaction.error);
         }
       };
-    }
-
-    transaction.onerror = () => {
-      if (!hasError) {
-        hasError = true;
-        reject(transaction.error);
-      }
-    };
-  });
+    });
+  }
 
   // Import entries - use a single transaction for all entries
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_ENTRIES], 'readwrite');
-    const store = transaction.objectStore(STORE_ENTRIES);
-    let completed = 0;
-    let hasError = false;
+  if (json.entries.length > 0) {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      let completed = 0;
+      let hasError = false;
+      const total = json.entries.length;
 
-    if (json.entries.length === 0) {
-      resolve();
-      return;
-    }
-
-    for (const entry of json.entries) {
-      const request = store.put(entry);
-      request.onsuccess = () => {
-        completed++;
-        if (completed === json.entries.length && !hasError) {
-          resolve();
+      // Queue all operations immediately (don't await between them)
+      json.entries.forEach((entry) => {
+        try {
+          const request = store.put(entry);
+          request.onsuccess = () => {
+            completed++;
+            if (completed === total && !hasError) {
+              resolve();
+            }
+          };
+          request.onerror = () => {
+            if (!hasError) {
+              hasError = true;
+              reject(request.error);
+            }
+          };
+        } catch (error) {
+          if (!hasError) {
+            hasError = true;
+            reject(error);
+          }
         }
-      };
-      request.onerror = () => {
+      });
+
+      transaction.onerror = (event) => {
         if (!hasError) {
           hasError = true;
-          reject(request.error);
+          reject(event.target.error || transaction.error);
         }
       };
-    }
-
-    transaction.onerror = () => {
-      if (!hasError) {
-        hasError = true;
-        reject(transaction.error);
-      }
-    };
-  });
+    });
+  }
 
   // Import preferences if available
   if (json.preferences) {
