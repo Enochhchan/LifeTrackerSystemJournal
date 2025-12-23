@@ -1131,7 +1131,7 @@
       }
       
       container.innerHTML = habits.map((habit, index) => `
-        <div class="habit-item draggable" draggable="true" data-habit-id="${habit.id}" data-index="${index}">
+        <div class="habit-item draggable" draggable="false" data-habit-id="${habit.id}" data-index="${index}">
           <span class="drag-handle">☰</span>
           <span class="habit-name">${escapeHtml(habit.name)}</span>
           <div class="habit-actions">
@@ -1178,37 +1178,83 @@
 
     function setupHabitDragAndDrop(container) {
       let draggedElement = null;
+      let isDragging = false;
 
       container.querySelectorAll('.draggable').forEach(item => {
-        item.addEventListener('dragstart', (e) => {
-          draggedElement = item;
-          item.classList.add('dragging');
-          e.dataTransfer.effectAllowed = 'move';
-        });
-
-        item.addEventListener('dragend', async () => {
-          item.classList.remove('dragging');
-          if (draggedElement) {
-            await saveHabitOrder(container);
-            draggedElement = null;
-          }
-        });
-
-        item.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
+        const dragHandle = item.querySelector('.drag-handle');
+        
+        // Use mousedown/touchstart on drag handle to initiate drag
+        if (dragHandle) {
+          let startY = 0;
+          let startScrollY = 0;
+          let dragStarted = false;
           
-          if (!draggedElement || draggedElement === item) return;
+          const startDrag = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragStarted = false;
+            startY = e.touches ? e.touches[0].clientY : e.clientY;
+            startScrollY = window.scrollY || document.documentElement.scrollTop;
+            
+            const handleMove = (moveEvent) => {
+              moveEvent.preventDefault();
+              const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+              const deltaY = Math.abs(currentY - startY);
+              const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+              const deltaScroll = Math.abs(currentScrollY - startScrollY);
+              
+              // If moved more than 5px vertically and scroll hasn't changed much, start dragging
+              if (deltaY > 5 && deltaScroll < 10) {
+                if (!dragStarted) {
+                  dragStarted = true;
+                  draggedElement = item;
+                  item.classList.add('dragging');
+                  // Prevent body scroll
+                  document.body.style.overflow = 'hidden';
+                  document.body.style.touchAction = 'none';
+                }
+                
+                // Move the element
+                const afterElement = getDragAfterElement(container, currentY);
+                if (afterElement == null) {
+                  container.appendChild(item);
+                } else {
+                  container.insertBefore(item, afterElement);
+                }
+              }
+            };
+            
+            const handleEnd = async () => {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleEnd);
+              document.removeEventListener('touchmove', handleMove);
+              document.removeEventListener('touchend', handleEnd);
+              
+              document.body.style.overflow = '';
+              document.body.style.touchAction = '';
+              
+              if (dragStarted && draggedElement) {
+                item.classList.remove('dragging');
+                await saveHabitOrder(container);
+                draggedElement = null;
+              }
+              dragStarted = false;
+            };
+            
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleEnd);
+            document.addEventListener('touchmove', handleMove, { passive: false });
+            document.addEventListener('touchend', handleEnd);
+          };
           
-          const afterElement = getDragAfterElement(container, e.clientY);
-          if (afterElement == null) {
-            container.appendChild(draggedElement);
-          } else {
-            container.insertBefore(draggedElement, afterElement);
-          }
-        });
-
-        item.addEventListener('drop', (e) => {
+          dragHandle.addEventListener('mousedown', startDrag);
+          dragHandle.addEventListener('touchstart', startDrag, { passive: false });
+          // Prevent text selection on drag handle
+          dragHandle.addEventListener('selectstart', (e) => e.preventDefault());
+        }
+        
+        // Prevent default drag behavior on the item itself
+        item.addEventListener('drag', (e) => {
           e.preventDefault();
         });
       });
