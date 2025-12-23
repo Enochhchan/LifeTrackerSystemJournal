@@ -1,8 +1,9 @@
 // IndexedDB Database Setup
 const DB_NAME = 'HabitJournalDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented for new stores
 const STORE_HABITS = 'habits';
 const STORE_ENTRIES = 'entries';
+const STORE_PREFERENCES = 'preferences';
 
 let db = null;
 
@@ -19,6 +20,7 @@ function initDB() {
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      const oldVersion = event.oldVersion;
 
       // Create habits store
       if (!db.objectStoreNames.contains(STORE_HABITS)) {
@@ -30,6 +32,11 @@ function initDB() {
       if (!db.objectStoreNames.contains(STORE_ENTRIES)) {
         const entriesStore = db.createObjectStore(STORE_ENTRIES, { keyPath: 'date' });
         entriesStore.createIndex('date', 'date', { unique: true });
+      }
+
+      // Create preferences store (version 2)
+      if (oldVersion < 2 && !db.objectStoreNames.contains(STORE_PREFERENCES)) {
+        const prefsStore = db.createObjectStore(STORE_PREFERENCES, { keyPath: 'key' });
       }
     };
   });
@@ -133,6 +140,7 @@ async function saveEntry(date, entryData) {
       highlight: entryData.highlight || '',
       journal: entryData.journal || '',
       screenTime: entryData.screenTime || null,
+      weight: entryData.weight || null,
       habitCompletions: entryData.habitCompletions || {}
     };
     const request = store.put(entry);
@@ -163,15 +171,60 @@ async function getAllEntries() {
   });
 }
 
+// Preferences operations
+async function getPreferences() {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_PREFERENCES], 'readonly');
+    const store = transaction.objectStore(STORE_PREFERENCES);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const prefs = {};
+      request.result.forEach(item => {
+        prefs[item.key] = item.value;
+      });
+      // Default preferences
+      const defaults = {
+        showScreenTime: false,
+        showWeight: false,
+        promptMoodOnOpen: true,
+        userName: ''
+      };
+      resolve({ ...defaults, ...prefs });
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setPreference(key, value) {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_PREFERENCES], 'readwrite');
+    const store = transaction.objectStore(STORE_PREFERENCES);
+    const pref = { key, value };
+    const request = store.put(pref);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setPreferences(prefs) {
+  if (!db) await initDB();
+  const promises = Object.entries(prefs).map(([key, value]) => setPreference(key, value));
+  return Promise.all(promises);
+}
+
 // Export/Import
 async function exportData() {
   const habits = await getHabits();
   const entries = await getAllEntries();
+  const preferences = await getPreferences();
   return {
-    version: 1,
+    version: 2,
     exportDate: new Date().toISOString(),
     habits: habits,
-    entries: entries
+    entries: entries,
+    preferences: preferences
   };
 }
 
@@ -200,6 +253,14 @@ async function importData(json) {
         clearRequest.onerror = () => reject(clearRequest.error);
   });
 
+  const prefsTransaction = db.transaction([STORE_PREFERENCES], 'readwrite');
+  const prefsStore = prefsTransaction.objectStore(STORE_PREFERENCES);
+  await new Promise((resolve, reject) => {
+    const clearRequest = prefsStore.clear();
+        clearRequest.onsuccess = () => resolve();
+        clearRequest.onerror = () => reject(clearRequest.error);
+  });
+
   // Import habits
   for (const habit of json.habits) {
     await new Promise((resolve, reject) => {
@@ -216,6 +277,11 @@ async function importData(json) {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  }
+
+  // Import preferences if available
+  if (json.preferences) {
+    await setPreferences(json.preferences);
   }
 }
 
@@ -313,6 +379,18 @@ async function getMostConsistentHabits() {
     .filter(h => h.rate > 0)
     .sort((a, b) => b.rate - a.rate)
     .slice(0, 3);
+}
+
+async function getWeightTrend(days = 30) {
+  const entries = await getAllEntries();
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+  return entries
+    .filter(e => e.date >= cutoffStr && e.weight !== null && e.weight !== undefined)
+    .map(e => ({ date: e.date, weight: e.weight }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // Utility functions

@@ -11,10 +11,58 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
+  <!-- Welcome Modal -->
+  <div id="welcome-modal" class="modal" style="display: none;">
+    <div class="modal-content welcome-modal-content">
+      <div class="welcome-header">
+        <h1>Welcome!</h1>
+        <p>Let's get started</p>
+      </div>
+      <div class="modal-body">
+        <div class="card">
+          <label for="user-name-input">What's your name?</label>
+          <input type="text" id="user-name-input" placeholder="Enter your name" maxlength="50" />
+        </div>
+        <button class="save-btn" id="save-name-btn">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mood Prompt Modal -->
+  <div id="mood-prompt-modal" class="modal" style="display: none;">
+    <div class="modal-content mood-prompt-content">
+      <div class="modal-header">
+        <h2>How are you feeling today?</h2>
+      </div>
+      <div class="modal-body">
+        <div class="mood-prompt-container">
+          <div class="mood-emoji-grid">
+            <button class="mood-emoji-btn" data-mood="1">😢</button>
+            <button class="mood-emoji-btn" data-mood="2">😞</button>
+            <button class="mood-emoji-btn" data-mood="3">😐</button>
+            <button class="mood-emoji-btn" data-mood="4">🙂</button>
+            <button class="mood-emoji-btn" data-mood="5">😊</button>
+            <button class="mood-emoji-btn" data-mood="6">😄</button>
+            <button class="mood-emoji-btn" data-mood="7">😁</button>
+            <button class="mood-emoji-btn" data-mood="8">🤩</button>
+            <button class="mood-emoji-btn" data-mood="9">🥳</button>
+            <button class="mood-emoji-btn" data-mood="10">🤗</button>
+          </div>
+          <div class="mood-slider-container">
+            <input type="range" id="mood-prompt-input" min="1" max="10" value="5" />
+            <div class="mood-value-large" id="mood-prompt-value">5</div>
+          </div>
+          <button class="save-btn" id="save-mood-prompt-btn">Save Mood</button>
+          <button class="skip-btn" id="skip-mood-btn">Skip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Today Tab -->
   <div id="today-tab" class="tab-content active">
     <div class="page-header">
-      <h1>Today</h1>
+      <h1 id="welcome-title">Today</h1>
       <div class="date-display" id="today-date"></div>
     </div>
 
@@ -44,7 +92,7 @@
       <textarea id="journal-input" rows="6" placeholder="Write about your day..."></textarea>
     </div>
 
-    <div class="card">
+    <div class="card" id="screen-time-card" style="display: none;">
       <label for="screen-time-input">Screen Time (minutes)</label>
       <div class="screen-time-container">
         <input type="number" id="screen-time-input" placeholder="Optional" min="0" />
@@ -58,6 +106,11 @@
           <li>View today's total at the top</li>
         </ol>
       </div>
+    </div>
+
+    <div class="card" id="weight-card" style="display: none;">
+      <label for="weight-input">Weight (lbs)</label>
+      <input type="number" id="weight-input" placeholder="Enter your weight" min="0" step="0.1" />
     </div>
 
     <button class="save-btn" id="save-today-btn">Save Entry</button>
@@ -99,12 +152,17 @@
       <canvas id="mood-chart"></canvas>
     </div>
 
+    <div class="card" id="weight-chart-card" style="display: none;">
+      <h2>Weight Trend (Last 30 Days)</h2>
+      <canvas id="weight-chart"></canvas>
+    </div>
+
     <div class="card">
       <h2>Journal Consistency</h2>
       <div id="journal-consistency"></div>
     </div>
 
-    <div class="card">
+  <div class="card">
       <h2>Most Consistent Habits</h2>
       <div id="most-consistent-habits"></div>
     </div>
@@ -257,6 +315,46 @@
       <h2>Reset Data</h2>
       <p>Permanently delete all habits and entries. This cannot be undone.</p>
       <button class="delete-btn" id="reset-btn">Reset All Data</button>
+  </div>
+
+    <div class="card">
+      <h2>Preferences</h2>
+      <div class="preference-item">
+        <label class="switch">
+          <input type="checkbox" id="pref-screen-time" />
+          <span class="slider"></span>
+        </label>
+        <div class="preference-label">
+          <span class="preference-title">Show Screen Time</span>
+          <span class="preference-desc">Display screen time field in Today tab</span>
+        </div>
+      </div>
+      <div class="preference-item">
+        <label class="switch">
+          <input type="checkbox" id="pref-weight" />
+          <span class="slider"></span>
+        </label>
+        <div class="preference-label">
+          <span class="preference-title">Show Weight Tracker</span>
+          <span class="preference-desc">Display weight field in Today tab</span>
+        </div>
+      </div>
+      <div class="preference-item">
+        <label class="switch">
+          <input type="checkbox" id="pref-mood-prompt" />
+          <span class="slider"></span>
+        </label>
+        <div class="preference-label">
+          <span class="preference-title">Prompt for Mood on Open</span>
+          <span class="preference-desc">Ask for mood when app opens</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your Name</h2>
+      <input type="text" id="settings-name-input" placeholder="Enter your name" maxlength="50" />
+      <button class="save-btn" id="save-settings-name-btn" style="margin-top: 12px;">Save Name</button>
     </div>
 
     <div class="card">
@@ -274,17 +372,67 @@
     let currentEditingDate = null;
     let currentEditingHabitId = null;
     let moodChart = null;
+    let weightChart = null;
+    let userPreferences = null;
 
     // Initialize app
     async function init() {
       try {
         await initDB();
+        userPreferences = await getPreferences();
         setupEventListeners();
+        await checkWelcomeScreen();
+        await loadPreferences();
+        await updateWelcomeTitle();
         loadTodayPage();
         updateTabBar();
+        await checkMoodPrompt();
       } catch (error) {
         console.error('Initialization error:', error);
         alert('Failed to initialize app: ' + error.message);
+      }
+    }
+
+    async function checkWelcomeScreen() {
+      const prefs = await getPreferences();
+      if (!prefs.userName || prefs.userName.trim() === '') {
+        document.getElementById('welcome-modal').style.display = 'flex';
+      }
+    }
+
+    async function checkMoodPrompt() {
+      const prefs = await getPreferences();
+      if (prefs.promptMoodOnOpen) {
+        const today = getTodayDate();
+        const entry = await getEntry(today);
+        if (!entry || entry.mood === null || entry.mood === undefined) {
+          document.getElementById('mood-prompt-modal').style.display = 'flex';
+        }
+      }
+    }
+
+    async function loadPreferences() {
+      const prefs = await getPreferences();
+      userPreferences = prefs;
+      
+      // Update UI based on preferences
+      document.getElementById('screen-time-card').style.display = prefs.showScreenTime ? 'block' : 'none';
+      document.getElementById('weight-card').style.display = prefs.showWeight ? 'block' : 'none';
+      
+      // Update settings checkboxes
+      document.getElementById('pref-screen-time').checked = prefs.showScreenTime;
+      document.getElementById('pref-weight').checked = prefs.showWeight;
+      document.getElementById('pref-mood-prompt').checked = prefs.promptMoodOnOpen;
+      document.getElementById('settings-name-input').value = prefs.userName || '';
+    }
+
+    async function updateWelcomeTitle() {
+      const prefs = await getPreferences();
+      const titleEl = document.getElementById('welcome-title');
+      if (prefs.userName && prefs.userName.trim() !== '') {
+        titleEl.textContent = `Welcome, ${prefs.userName}!`;
+      } else {
+        titleEl.textContent = 'Today';
       }
     }
 
@@ -336,6 +484,28 @@
         document.getElementById('edit-mood-value').textContent = e.target.value;
       });
 
+      // Welcome modal
+      document.getElementById('save-name-btn').addEventListener('click', saveUserName);
+      document.getElementById('user-name-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveUserName();
+      });
+
+      // Mood prompt modal
+      document.getElementById('mood-prompt-input').addEventListener('input', (e) => {
+        document.getElementById('mood-prompt-value').textContent = e.target.value;
+      });
+      document.querySelectorAll('.mood-emoji-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mood = parseInt(btn.dataset.mood);
+          document.getElementById('mood-prompt-input').value = mood;
+          document.getElementById('mood-prompt-value').textContent = mood;
+        });
+      });
+      document.getElementById('save-mood-prompt-btn').addEventListener('click', saveMoodPrompt);
+      document.getElementById('skip-mood-btn').addEventListener('click', () => {
+        document.getElementById('mood-prompt-modal').style.display = 'none';
+      });
+
       // Settings
       document.getElementById('export-btn').addEventListener('click', handleExportData);
       document.getElementById('import-btn').addEventListener('click', () => {
@@ -344,12 +514,70 @@
       document.getElementById('import-file').addEventListener('change', handleImportData);
       document.getElementById('reset-btn').addEventListener('click', resetDataConfirm);
       document.getElementById('save-config-url-btn').addEventListener('click', saveConfigUrl);
+      
+      // Preferences
+      document.getElementById('pref-screen-time').addEventListener('change', (e) => {
+        setPreference('showScreenTime', e.target.checked);
+        document.getElementById('screen-time-card').style.display = e.target.checked ? 'block' : 'none';
+      });
+      document.getElementById('pref-weight').addEventListener('change', (e) => {
+        setPreference('showWeight', e.target.checked);
+        document.getElementById('weight-card').style.display = e.target.checked ? 'block' : 'none';
+        if (e.target.checked) {
+          loadStatsPage(); // Reload stats to show weight chart
+        } else {
+          document.getElementById('weight-chart-card').style.display = 'none';
+        }
+      });
+      document.getElementById('pref-mood-prompt').addEventListener('change', (e) => {
+        setPreference('promptMoodOnOpen', e.target.checked);
+      });
+      document.getElementById('save-settings-name-btn').addEventListener('click', saveSettingsUserName);
+      document.getElementById('settings-name-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveSettingsUserName();
+      });
 
       // Load saved config URL
       const savedConfigUrl = localStorage.getItem('habit_journal_config_url');
       if (savedConfigUrl) {
         document.getElementById('config-url-input').value = savedConfigUrl;
       }
+    }
+
+    async function saveUserName() {
+      const name = document.getElementById('user-name-input').value.trim();
+      if (!name) {
+        alert('Please enter your name');
+        return;
+      }
+      await setPreference('userName', name);
+      document.getElementById('welcome-modal').style.display = 'none';
+      await updateWelcomeTitle();
+      await loadPreferences();
+    }
+
+    async function saveSettingsUserName() {
+      const name = document.getElementById('settings-name-input').value.trim();
+      await setPreference('userName', name);
+      await updateWelcomeTitle();
+      const statusEl = document.createElement('div');
+      statusEl.textContent = 'Name saved!';
+      statusEl.className = 'save-status success';
+      statusEl.style.marginTop = '12px';
+      document.getElementById('save-settings-name-btn').parentElement.appendChild(statusEl);
+      setTimeout(() => statusEl.remove(), 2000);
+    }
+
+    async function saveMoodPrompt() {
+      const mood = parseInt(document.getElementById('mood-prompt-input').value);
+      const today = getTodayDate();
+      const entry = await getEntry(today) || {};
+      await saveEntry(today, {
+        ...entry,
+        mood: mood
+      });
+      document.getElementById('mood-prompt-modal').style.display = 'none';
+      await loadTodayPage(); // Refresh today page
     }
 
     function switchTab(tabName) {
@@ -399,12 +627,14 @@
         document.getElementById('highlight-input').value = entry.highlight || '';
         document.getElementById('journal-input').value = entry.journal || '';
         document.getElementById('screen-time-input').value = entry.screenTime || '';
+        document.getElementById('weight-input').value = entry.weight || '';
       } else {
         document.getElementById('mood-input').value = 5;
         document.getElementById('mood-value').textContent = '5';
         document.getElementById('highlight-input').value = '';
         document.getElementById('journal-input').value = '';
         document.getElementById('screen-time-input').value = '';
+        document.getElementById('weight-input').value = '';
       }
 
       // Load habits checklist
@@ -442,6 +672,8 @@
       const journal = document.getElementById('journal-input').value.trim();
       const screenTime = document.getElementById('screen-time-input').value.trim();
       const screenTimeNum = screenTime ? parseInt(screenTime) : null;
+      const weight = document.getElementById('weight-input').value.trim();
+      const weightNum = weight ? parseFloat(weight) : null;
 
       // Get habit completions
       const habitCompletions = {};
@@ -455,6 +687,7 @@
           highlight,
           journal,
           screenTime: screenTimeNum,
+          weight: weightNum,
           habitCompletions
         });
 
@@ -580,6 +813,7 @@
     async function loadStatsPage() {
       await renderHabitStats();
       await renderMoodChart();
+      await renderWeightChart();
       await renderJournalConsistency();
       await renderMostConsistentHabits();
     }
@@ -678,6 +912,60 @@
       });
     }
 
+    async function renderWeightChart() {
+      const prefs = await getPreferences();
+      if (!prefs.showWeight) {
+        document.getElementById('weight-chart-card').style.display = 'none';
+        return;
+      }
+
+      const weightData = await getWeightTrend(30);
+      const ctx = document.getElementById('weight-chart');
+      if (!ctx) return;
+
+      if (weightChart) {
+        weightChart.destroy();
+      }
+
+      if (weightData.length === 0) {
+        document.getElementById('weight-chart-card').style.display = 'none';
+        return;
+      }
+
+      document.getElementById('weight-chart-card').style.display = 'block';
+      const chartCtx = ctx.getContext('2d');
+
+      weightChart = new Chart(chartCtx, {
+        type: 'line',
+        data: {
+          labels: weightData.map(d => formatDateShort(d.date)),
+          datasets: [{
+            label: 'Weight (lbs)',
+            data: weightData.map(d => d.weight),
+            borderColor: '#34C759',
+            backgroundColor: 'rgba(52, 199, 89, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 1.5,
+          scales: {
+            y: {
+              beginAtZero: false
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
     async function renderJournalConsistency() {
       const consistency = await getJournalConsistency();
       const container = document.getElementById('journal-consistency');
@@ -755,6 +1043,20 @@
       document.getElementById('modal-highlight').textContent = entry.highlight || 'None';
       document.getElementById('modal-journal').textContent = entry.journal || 'No journal entry';
       document.getElementById('modal-screen-time').textContent = entry.screenTime ? `${entry.screenTime} minutes` : 'Not set';
+      
+      // Add weight to modal if it exists
+      const modalBody = document.querySelector('#history-modal .modal-body');
+      let weightDiv = document.getElementById('modal-weight');
+      if (!weightDiv && entry.weight) {
+        weightDiv = document.createElement('div');
+        weightDiv.className = 'card';
+        weightDiv.id = 'modal-weight';
+        weightDiv.innerHTML = '<label>Weight</label><div id="modal-weight-value"></div>';
+        modalBody.insertBefore(weightDiv, document.getElementById('modal-screen-time').parentElement.nextSibling);
+      }
+      if (weightDiv) {
+        document.getElementById('modal-weight-value').textContent = entry.weight ? `${entry.weight} lbs` : 'Not set';
+      }
 
       // Load habits for this entry
       const habits = await getHabits();
@@ -779,6 +1081,26 @@
       document.getElementById('edit-highlight-input').value = entry.highlight || '';
       document.getElementById('edit-journal-input').value = entry.journal || '';
       document.getElementById('edit-screen-time-input').value = entry.screenTime || '';
+      
+      // Add weight field to edit modal if preference is enabled
+      const prefs = await getPreferences();
+      let weightInput = document.getElementById('edit-weight-input');
+      if (prefs.showWeight) {
+        if (!weightInput) {
+          const weightCard = document.createElement('div');
+          weightCard.className = 'card';
+          weightCard.innerHTML = `
+            <label for="edit-weight-input">Weight (lbs)</label>
+            <input type="number" id="edit-weight-input" min="0" step="0.1" />
+          `;
+          const editBody = document.querySelector('#edit-modal .modal-body');
+          editBody.insertBefore(weightCard, document.getElementById('edit-screen-time-input').parentElement.nextSibling);
+          weightInput = document.getElementById('edit-weight-input');
+        }
+        weightInput.value = entry.weight || '';
+      } else if (weightInput) {
+        weightInput.parentElement.remove();
+      }
 
       await loadHabitsChecklist('edit-habits-checklist', entry.habitCompletions || {});
       document.getElementById('edit-modal').style.display = 'block';
@@ -790,6 +1112,9 @@
       const journal = document.getElementById('edit-journal-input').value.trim();
       const screenTime = document.getElementById('edit-screen-time-input').value.trim();
       const screenTimeNum = screenTime ? parseInt(screenTime) : null;
+      const weightInput = document.getElementById('edit-weight-input');
+      const weight = weightInput ? weightInput.value.trim() : '';
+      const weightNum = weight ? parseFloat(weight) : null;
 
       // Get habit completions
       const habitCompletions = {};
@@ -803,6 +1128,7 @@
           highlight,
           journal,
           screenTime: screenTimeNum,
+          weight: weightNum,
           habitCompletions
         });
 
