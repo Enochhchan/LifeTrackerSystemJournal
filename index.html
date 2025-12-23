@@ -1968,9 +1968,15 @@
           
           // Reload all pages
           await loadTodayPage();
-          await loadHabitsPage();
           await loadStatsPage();
           await loadHistoryPage();
+          await loadCalendar();
+          
+          // Reload habits list if manage habits modal is open
+          const manageHabitsModal = document.getElementById('manage-habits-modal');
+          if (manageHabitsModal && manageHabitsModal.style.display !== 'none') {
+            await renderHabitsList();
+          }
           
           setTimeout(() => {
             document.getElementById('import-status').textContent = '';
