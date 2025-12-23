@@ -972,6 +972,9 @@ button {
 }
 
 .history-list-compact {
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -980,14 +983,17 @@ button {
 .history-row {
   display: flex;
   align-items: center;
-  padding: 14px 18px;
+  padding: 12px 14px;
   background-color: var(--surface);
   border-radius: 12px;
   box-shadow: var(--card-shadow);
   margin-bottom: 8px;
-  gap: 16px;
+  gap: 12px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .history-row:hover {
@@ -996,49 +1002,57 @@ button {
 }
 
 .history-date-col {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
-  min-width: 120px;
+  flex-shrink: 0;
+  width: 100px;
 }
 
 .history-row-right {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: center;
   flex: 1;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .history-mood-col {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--primary-color);
   text-align: center;
-  min-width: 60px;
+  width: 50px;
+  flex-shrink: 0;
 }
 
 .history-habits-col {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .history-header {
   display: flex;
   align-items: center;
-  padding: 14px 18px;
+  padding: 12px 14px;
   background-color: var(--surface);
   border-radius: 12px;
   box-shadow: var(--card-shadow);
   margin-bottom: 8px;
-  gap: 16px;
+  gap: 12px;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .history-header-left {
-  min-width: 120px;
+  flex-shrink: 0;
+  width: 100px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   text-transform: uppercase;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
@@ -1046,35 +1060,38 @@ button {
 
 .history-header-right {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: center;
   flex: 1;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .history-header-col {
   text-align: center;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
-  min-width: 50px;
+  flex-shrink: 0;
 }
 
 .history-header-col.mood-col {
-  min-width: 60px;
+  width: 50px;
 }
 
 .history-header-col.habit-col {
-  min-width: 40px;
-  font-size: 10px;
+  width: 32px;
+  font-size: 9px;
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  height: 50px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .habit-box {
