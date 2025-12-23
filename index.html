@@ -267,11 +267,13 @@
     </div>
 
     <div class="history-header">
-      <div class="history-header-col date-col">DATE</div>
-      <div class="history-header-col mood-col">MOOD</div>
-      <div class="history-header-col habit-col" id="history-habit-1">-</div>
-      <div class="history-header-col habit-col" id="history-habit-2">-</div>
-      <div class="history-header-col habit-col" id="history-habit-3">-</div>
+      <div class="history-header-left">DATE</div>
+      <div class="history-header-right">
+        <div class="history-header-col mood-col">MOOD</div>
+        <div class="history-header-col habit-col" id="history-habit-1">-</div>
+        <div class="history-header-col habit-col" id="history-habit-2">-</div>
+        <div class="history-header-col habit-col" id="history-habit-3">-</div>
+      </div>
     </div>
     <div id="history-list" class="history-list-compact"></div>
     <div class="empty-state" id="history-empty" style="display: none;">
@@ -1031,7 +1033,7 @@
 
     async function loadHabitsChecklist(containerId, completions = {}) {
       const container = document.getElementById(containerId);
-      const habits = await getHabits();
+      let habits = await getHabits();
 
       if (habits.length === 0) {
         if (containerId === 'habits-checklist') {
@@ -1043,6 +1045,17 @@
 
       if (containerId === 'habits-checklist') {
         document.getElementById('habits-empty').style.display = 'none';
+      }
+
+      // Apply ordering from preferences
+      const prefs = await getPreferences();
+      if (prefs.habitOrder && prefs.habitOrder.length > 0) {
+        const orderMap = new Map(prefs.habitOrder.map((id, idx) => [id, idx]));
+        habits = habits.sort((a, b) => {
+          const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 999;
+          const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 999;
+          return aIdx - bIdx;
+        });
       }
 
       container.innerHTML = habits.map(habit => `
@@ -1655,7 +1668,7 @@
         return `
           <div class="history-row" data-date="${entry.date}">
             <div class="history-date-col">${formatDateShort(entry.date)}</div>
-            <div class="history-header-right">
+            <div class="history-row-right">
               <div class="history-mood-col">${entry.mood ? `${entry.mood}/10` : '-'}</div>
               <div class="history-habits-col">${habitBoxes}</div>
             </div>
