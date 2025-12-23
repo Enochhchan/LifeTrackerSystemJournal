@@ -187,7 +187,6 @@
             <button class="suggestion-chip" data-habit="Meditate">Meditate</button>
             <button class="suggestion-chip" data-habit="Water">Water</button>
             <button class="suggestion-chip" data-habit="Sleep">Sleep</button>
-            <button class="suggestion-chip" data-habit="Journal">Journal</button>
             <button class="suggestion-chip" data-habit="Walk">Walk</button>
             <button class="suggestion-chip" data-habit="Yoga">Yoga</button>
           </div>
@@ -211,11 +210,8 @@
     </div>
 
     <div class="card">
-      <div class="collapsible-header" id="habit-stats-header">
-        <h2>Habit Completion</h2>
-        <span class="collapse-icon">▼</span>
-      </div>
-      <div id="habit-stats-container" class="collapsible-content"></div>
+      <h2>Habit Completion</h2>
+      <div id="habit-stats-container"></div>
     </div>
 
     <div class="card">
@@ -618,14 +614,19 @@
           document.getElementById('habit-char-count').textContent = habit.length;
         });
       });
-
-      // Collapsible habit stats
-      document.getElementById('habit-stats-header').addEventListener('click', () => {
-        const container = document.getElementById('habit-stats-container');
-        const icon = document.querySelector('#habit-stats-header .collapse-icon');
-        container.classList.toggle('collapsed');
-        icon.classList.toggle('rotated');
+      
+      // Auto-capitalize on input
+      document.getElementById('new-habit-input').addEventListener('blur', (e) => {
+        let value = e.target.value.trim();
+        if (value) {
+          value = value.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          ).join(' ');
+          e.target.value = value;
+          document.getElementById('habit-char-count').textContent = value.length;
+        }
       });
+
 
       // Theme toggle
       document.getElementById('pref-theme').addEventListener('change', (e) => {
@@ -1043,25 +1044,46 @@
       let draggedElement = null;
 
       container.querySelectorAll('.draggable').forEach(item => {
-        item.addEventListener('dragstart', (e) => {
-          draggedElement = item;
-          item.classList.add('dragging');
-          e.dataTransfer.effectAllowed = 'move';
-        });
+        const dragHandle = item.querySelector('.drag-handle');
+        
+        // Remove draggable from item itself
+        item.setAttribute('draggable', 'false');
+        
+        // Make the drag handle the draggable element
+        if (dragHandle) {
+          dragHandle.setAttribute('draggable', 'true');
+          
+          dragHandle.addEventListener('dragstart', (e) => {
+            draggedElement = item;
+            item.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.stopPropagation();
+          });
 
-        item.addEventListener('dragend', () => {
-          item.classList.remove('dragging');
-        });
-
+          dragHandle.addEventListener('dragend', () => {
+            if (draggedElement) {
+              draggedElement.classList.remove('dragging');
+            }
+          });
+        }
+        
+        // Make the whole item a drop zone
         item.addEventListener('dragover', (e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
+          
+          if (!draggedElement || draggedElement === item) return;
+          
           const afterElement = getDragAfterElement(container, e.clientY);
           if (afterElement == null) {
             container.appendChild(draggedElement);
           } else {
             container.insertBefore(draggedElement, afterElement);
           }
+        });
+        
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
         });
       });
     }
@@ -1096,16 +1118,22 @@
 
     async function handleAddHabit() {
       const input = document.getElementById('new-habit-input');
-      const name = input.value.trim();
+      let name = input.value.trim();
 
       if (!name) {
         alert('Please enter a habit name');
         return;
       }
 
+      // Auto-capitalize: capitalize first letter of each word
+      name = name.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
+
       try {
         await addHabit(name);
         input.value = '';
+        document.getElementById('habit-char-count').textContent = '0';
         await renderHabitsList();
         // Reload checklist on Today page if it's visible
         if (document.getElementById('today-tab').classList.contains('active')) {
@@ -1129,12 +1157,17 @@
     }
 
     async function saveHabitEdit() {
-      const name = document.getElementById('edit-habit-name-input').value.trim();
+      let name = document.getElementById('edit-habit-name-input').value.trim();
 
       if (!name) {
         alert('Please enter a habit name');
         return;
       }
+
+      // Auto-capitalize
+      name = name.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
 
       try {
         await updateHabit(currentEditingHabitId, name);
@@ -1189,7 +1222,7 @@
       // Start collapsed
       container.classList.add('collapsed');
 
-      const statsHtml = await Promise.all(habits.map(async (habit) => {
+      const statsHtml = await Promise.all(habits.map(async (habit, index) => {
         const stats7d = await calculateHabitStats(habit.id, 7);
         const stats30d = await calculateHabitStats(habit.id, 30);
         const statsAll = await calculateHabitStats(habit.id, 9999);
@@ -1197,26 +1230,31 @@
 
         return `
           <div class="habit-stat-item">
-            <h3>${escapeHtml(habit.name)}</h3>
-            <div class="stat-row">
-              <span>7 days:</span>
-              <span>${stats7d.completed}/${stats7d.total} (${stats7d.rate}%)</span>
+            <div class="collapsible-header habit-stat-header" data-habit-index="${index}">
+              <h3>${escapeHtml(habit.name)}</h3>
+              <span class="collapse-icon">▼</span>
             </div>
-            <div class="stat-row">
-              <span>30 days:</span>
-              <span>${stats30d.completed}/${stats30d.total} (${stats30d.rate}%)</span>
-            </div>
-            <div class="stat-row">
-              <span>All time:</span>
-              <span>${statsAll.completed}/${statsAll.total} (${statsAll.rate}%)</span>
-            </div>
-            <div class="stat-row">
-              <span>Current streak:</span>
-              <span>${streak.current} days</span>
-            </div>
-            <div class="stat-row">
-              <span>Longest streak:</span>
-              <span>${streak.longest} days</span>
+            <div class="habit-stat-content collapsed" data-habit-content="${index}">
+              <div class="stat-row">
+                <span>7 days:</span>
+                <span>${stats7d.completed}/${stats7d.total} (${stats7d.rate}%)</span>
+              </div>
+              <div class="stat-row">
+                <span>30 days:</span>
+                <span>${stats30d.completed}/${stats30d.total} (${stats30d.rate}%)</span>
+              </div>
+              <div class="stat-row">
+                <span>All time:</span>
+                <span>${statsAll.completed}/${statsAll.total} (${statsAll.rate}%)</span>
+              </div>
+              <div class="stat-row">
+                <span>Current streak:</span>
+                <span>${streak.current} days</span>
+              </div>
+              <div class="stat-row">
+                <span>Longest streak:</span>
+                <span>${streak.longest} days</span>
+              </div>
             </div>
           </div>
         `;
@@ -1224,8 +1262,16 @@
 
       container.innerHTML = statsHtml.join('');
       
-      // Initially collapse
-      container.classList.add('collapsed');
+      // Add click listeners for collapsible headers
+      container.querySelectorAll('.habit-stat-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const index = header.dataset.habitIndex;
+          const content = container.querySelector(`[data-habit-content="${index}"]`);
+          const icon = header.querySelector('.collapse-icon');
+          content.classList.toggle('collapsed');
+          icon.classList.toggle('rotated');
+        });
+      });
     }
 
     async function renderMoodChart() {
