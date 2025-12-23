@@ -1109,7 +1109,7 @@
     async function renderHabitsList() {
       const container = document.getElementById('habits-list');
       const emptyState = document.getElementById('habits-list-empty');
-      const habits = await getHabits();
+      let habits = await getHabits();
 
       if (habits.length === 0) {
         container.innerHTML = '';
