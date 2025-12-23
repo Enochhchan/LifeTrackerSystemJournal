@@ -277,17 +277,33 @@ async function importData(json) {
       let hasError = false;
       const total = json.habits.length;
 
+      // Set up error handler first
+      transaction.onerror = (event) => {
+        if (!hasError) {
+          hasError = true;
+          reject(event.target.error || transaction.error);
+        }
+      };
+
+      // Wait for transaction to complete, then resolve
+      transaction.oncomplete = () => {
+        if (!hasError && completed === total) {
+          resolve();
+        } else if (!hasError) {
+          // This shouldn't happen, but handle it
+          reject(new Error(`Transaction completed but only ${completed} of ${total} operations succeeded`));
+        }
+      };
+
       // Queue all operations immediately (don't await between them)
       // Remove 'id' field since we're using autoIncrement
-      json.habits.forEach((habit) => {
+      for (let i = 0; i < json.habits.length; i++) {
+        const habit = json.habits[i];
         try {
           const habitToAdd = { name: habit.name, createdAt: habit.createdAt || new Date().toISOString() };
           const request = store.add(habitToAdd);
           request.onsuccess = () => {
             completed++;
-            if (completed === total && !hasError) {
-              resolve();
-            }
           };
           request.onerror = () => {
             if (!hasError) {
@@ -301,14 +317,7 @@ async function importData(json) {
             reject(error);
           }
         }
-      });
-
-      transaction.onerror = (event) => {
-        if (!hasError) {
-          hasError = true;
-          reject(event.target.error || transaction.error);
-        }
-      };
+      }
     });
   }
 
@@ -321,15 +330,31 @@ async function importData(json) {
       let hasError = false;
       const total = json.entries.length;
 
+      // Set up error handler first
+      transaction.onerror = (event) => {
+        if (!hasError) {
+          hasError = true;
+          reject(event.target.error || transaction.error);
+        }
+      };
+
+      // Wait for transaction to complete, then resolve
+      transaction.oncomplete = () => {
+        if (!hasError && completed === total) {
+          resolve();
+        } else if (!hasError) {
+          // This shouldn't happen, but handle it
+          reject(new Error(`Transaction completed but only ${completed} of ${total} operations succeeded`));
+        }
+      };
+
       // Queue all operations immediately (don't await between them)
-      json.entries.forEach((entry) => {
+      for (let i = 0; i < json.entries.length; i++) {
+        const entry = json.entries[i];
         try {
           const request = store.put(entry);
           request.onsuccess = () => {
             completed++;
-            if (completed === total && !hasError) {
-              resolve();
-            }
           };
           request.onerror = () => {
             if (!hasError) {
@@ -343,14 +368,7 @@ async function importData(json) {
             reject(error);
           }
         }
-      });
-
-      transaction.onerror = (event) => {
-        if (!hasError) {
-          hasError = true;
-          reject(event.target.error || transaction.error);
-        }
-      };
+      }
     });
   }
 
