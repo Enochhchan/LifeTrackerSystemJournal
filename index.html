@@ -1542,10 +1542,14 @@
 
     async function renderMoodChart() {
       const moodData = await getMoodTrend(30);
-      const ctx = document.getElementById('mood-chart').getContext('2d');
+      const chartElement = document.getElementById('mood-chart');
+      if (!chartElement) return;
+      
+      const ctx = chartElement.getContext('2d');
 
       if (moodChart) {
         moodChart.destroy();
+        moodChart = null;
       }
 
       if (moodData.length === 0) {
@@ -1617,6 +1621,7 @@
 
       if (weightChart) {
         weightChart.destroy();
+        weightChart = null;
       }
 
       if (weightData.length === 0) {
@@ -1966,16 +1971,30 @@
           document.getElementById('import-status').textContent = 'Import successful!';
           document.getElementById('import-status').className = 'save-status success';
           
+          // Reload preferences first to ensure they're available
+          await loadPreferences();
+          
           // Reload all pages
           await loadTodayPage();
-          await loadStatsPage();
           await loadHistoryPage();
           await loadCalendar();
+          await loadStatsPage(); // Load stats last to ensure all data is available
           
           // Reload habits list if manage habits modal is open
           const manageHabitsModal = document.getElementById('manage-habits-modal');
           if (manageHabitsModal && manageHabitsModal.style.display !== 'none') {
             await renderHabitsList();
+          }
+          
+          // Force refresh if stats tab is active
+          if (document.getElementById('stats-tab').classList.contains('active')) {
+            await loadStatsPage();
+          }
+          
+          // Force refresh if history tab is active
+          if (document.getElementById('history-tab').classList.contains('active')) {
+            await loadHistoryPage();
+            await loadCalendar();
           }
           
           setTimeout(() => {
