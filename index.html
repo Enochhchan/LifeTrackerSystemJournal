@@ -507,11 +507,15 @@
     let saveTimeout = null;
     let topHabits = [null, null, null]; // Top 3 habits for history view
 
+    // Track last known date to detect day changes
+    let lastKnownDate = null;
+
     // Initialize app
     async function init() {
       try {
         await initDB();
         userPreferences = await getPreferences();
+        lastKnownDate = getTodayDate();
         setupEventListeners();
         await checkWelcomeScreen();
         await loadPreferences();
@@ -519,9 +523,27 @@
         loadTodayPage();
         updateTabBar();
         await checkMoodPrompt();
+        
+        // Check for day change when page becomes visible
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleVisibilityChange);
       } catch (error) {
         console.error('Initialization error:', error);
         alert('Failed to initialize app: ' + error.message);
+      }
+    }
+
+    async function handleVisibilityChange() {
+      if (!document.hidden) {
+        const currentDate = getTodayDate();
+        if (lastKnownDate && currentDate !== lastKnownDate) {
+          // Day has changed, reload the today page
+          lastKnownDate = currentDate;
+          if (document.getElementById('today-tab').classList.contains('active')) {
+            await loadTodayPage();
+            await checkMoodPrompt();
+          }
+        }
       }
     }
 
@@ -900,6 +922,11 @@
 
       // Load tab-specific content
       if (tabName === 'today') {
+        // Check if day has changed
+        const currentDate = getTodayDate();
+        if (lastKnownDate && currentDate !== lastKnownDate) {
+          lastKnownDate = currentDate;
+        }
         loadTodayPage();
       } else if (tabName === 'stats') {
         loadStatsPage();
