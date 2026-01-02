@@ -2160,7 +2160,7 @@
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const entry = entries.find(e => e.date === dateStr);
         
-        let colorClass = 'empty';
+        let colorClass = '';
         let status = '';
         
         if (viewType === 'mood') {
@@ -2186,6 +2186,7 @@
           }
         }
         
+        // All days should be clickable, even without entries (don't use 'empty' class for days without entries)
         calendarHtml += `
           <div class="calendar-day ${colorClass}" data-date="${dateStr}" title="${dateStr}">
             <span class="calendar-day-number">${day}</span>
@@ -2200,7 +2201,8 @@
       // Add click listeners - make all days (except empty padding) clickable
       container.querySelectorAll('.calendar-day').forEach(day => {
         const date = day.dataset.date;
-        if (date && !day.classList.contains('empty')) {
+        // Only exclude padding days (which don't have data-date), all actual calendar days should be clickable
+        if (date) {
           day.style.cursor = 'pointer';
           day.addEventListener('click', () => {
             openCalendarDay(date);
