@@ -1823,7 +1823,13 @@
 
     async function openHistoryModal(date) {
       const entry = await getEntry(date);
-      if (!entry) return;
+      
+      // If no entry exists, open edit modal directly to create one
+      if (!entry) {
+        currentEditingDate = date;
+        await openEditModalForDate(date);
+        return;
+      }
 
       document.getElementById('modal-date').textContent = formatDate(date);
       document.getElementById('modal-mood').textContent = entry.mood ? `${entry.mood}/10` : 'Not set';
@@ -1863,12 +1869,29 @@
       document.getElementById('history-modal').style.display = 'block';
     }
 
+    // Open calendar day - either show history modal or edit modal directly
+    async function openCalendarDay(date) {
+      const entry = await getEntry(date);
+      if (entry) {
+        // Entry exists, show history modal first
+        openHistoryModal(date);
+      } else {
+        // No entry exists, open edit modal directly to create one
+        currentEditingDate = date;
+        await openEditModalForDate(date);
+      }
+    }
+
     async function openEditModal() {
       document.getElementById('history-modal').style.display = 'none';
-      const entry = await getEntry(currentEditingDate);
-      if (!entry) return;
+      if (!currentEditingDate) return;
+      await openEditModalForDate(currentEditingDate);
+    }
 
-      document.getElementById('edit-modal-date').textContent = formatDate(currentEditingDate);
+    async function openEditModalForDate(date) {
+      const entry = await getEntry(date) || {}; // Allow creating new entries
+
+      document.getElementById('edit-modal-date').textContent = formatDate(date);
       document.getElementById('edit-mood-input').value = entry.mood || 5;
       document.getElementById('edit-mood-value').textContent = entry.mood || 5;
       document.getElementById('edit-highlight-input').value = entry.highlight || '';
@@ -2174,14 +2197,15 @@
       calendarHtml += '</div>';
       container.innerHTML = calendarHtml;
       
-      // Add click listeners
-      container.querySelectorAll('.calendar-day:not(.empty)').forEach(day => {
-        day.addEventListener('click', () => {
-          const date = day.dataset.date;
-          if (date) {
-            openHistoryModal(date);
-          }
-        });
+      // Add click listeners - make all days (except empty padding) clickable
+      container.querySelectorAll('.calendar-day').forEach(day => {
+        const date = day.dataset.date;
+        if (date && !day.classList.contains('empty')) {
+          day.style.cursor = 'pointer';
+          day.addEventListener('click', () => {
+            openCalendarDay(date);
+          });
+        }
       });
     }
     
