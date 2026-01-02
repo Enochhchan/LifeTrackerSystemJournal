@@ -526,9 +526,11 @@ async function getWeightTrend(days = 30) {
 // Utility functions
 function getTodayDate() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  // Subtract 3 hours so that times between midnight and 3am count as the previous day
+  const adjustedTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const year = adjustedTime.getFullYear();
+  const month = String(adjustedTime.getMonth() + 1).padStart(2, '0');
+  const day = String(adjustedTime.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 

@@ -1058,10 +1058,18 @@
       }, 1000);
     }
 
-    async function openJournalModal() {
-      const today = getTodayDate();
-      const entry = await getEntry(today);
-      const journalText = entry?.journal || '';
+    async function openJournalModal(isEditMode = false) {
+      let journalText = '';
+      if (isEditMode && currentEditingDate) {
+        // Editing an existing entry
+        const entry = await getEntry(currentEditingDate);
+        journalText = entry?.journal || '';
+      } else {
+        // Today's entry
+        const today = getTodayDate();
+        const entry = await getEntry(today);
+        journalText = entry?.journal || '';
+      }
       document.getElementById('journal-modal-input').value = journalText;
       document.getElementById('journal-char-count').textContent = journalText.length.toLocaleString();
       document.getElementById('journal-modal').style.display = 'flex';
@@ -1069,21 +1077,24 @@
 
     function closeJournalModal() {
       document.getElementById('journal-modal').style.display = 'none';
-      // Update preview
+      // Update preview - check if we're in edit mode
       const journalText = document.getElementById('journal-modal-input').value;
-      updateJournalPreview(journalText);
-    }
-
-    function updateJournalPreview(text) {
-      const preview = document.getElementById('journal-preview');
-      if (!text || text.trim() === '') {
-        preview.innerHTML = '<p class="journal-preview-empty">No journal entry yet. Click "Open Journal" to start writing.</p>';
+      if (currentEditingDate && document.getElementById('edit-modal').style.display !== 'none') {
+        // Update edit preview
+        const editJournalPreview = document.getElementById('edit-journal-preview');
+        if (editJournalPreview) {
+          if (!journalText || journalText.trim() === '') {
+            editJournalPreview.innerHTML = '<p class="journal-preview-empty">No journal entry yet. Click "Open Journal" to start writing.</p>';
+          } else {
+            const previewText = journalText.length > 150 ? journalText.substring(0, 150) + '...' : journalText;
+            editJournalPreview.innerHTML = `<p>${escapeHtml(previewText)}</p>`;
+          }
+        }
       } else {
-        const previewText = text.length > 150 ? text.substring(0, 150) + '...' : text;
-        preview.innerHTML = `<p>${escapeHtml(previewText)}</p>`;
+        // Update today preview
+        updateJournalPreview(journalText);
       }
     }
-
 
     function updateJournalPreview(text) {
       const preview = document.getElementById('journal-preview');
@@ -1861,7 +1872,15 @@
       document.getElementById('edit-mood-input').value = entry.mood || 5;
       document.getElementById('edit-mood-value').textContent = entry.mood || 5;
       document.getElementById('edit-highlight-input').value = entry.highlight || '';
-      updateEditJournalPreview(entry.journal || '');
+      // Update edit journal preview
+      const editJournalPreview = document.getElementById('edit-journal-preview');
+      const journalText = entry.journal || '';
+      if (!journalText || journalText.trim() === '') {
+        editJournalPreview.innerHTML = '<p class="journal-preview-empty">No journal entry yet. Click "Open Journal" to start writing.</p>';
+      } else {
+        const previewText = journalText.length > 150 ? journalText.substring(0, 150) + '...' : journalText;
+        editJournalPreview.innerHTML = `<p>${escapeHtml(previewText)}</p>`;
+      }
       const screenTimeMins = entry.screenTime || 0;
       const screenTimeHours = Math.floor(screenTimeMins / 60);
       const screenTimeRemainder = screenTimeMins % 60;
@@ -1894,8 +1913,14 @@
     }
 
     async function saveEditEntry() {
+      if (!currentEditingDate) {
+        alert('No entry selected to edit');
+        return;
+      }
+      
       const mood = parseInt(document.getElementById('edit-mood-input').value);
       const highlight = document.getElementById('edit-highlight-input').value.trim();
+      // Get journal from modal input (it's shared between today and edit)
       const journal = document.getElementById('journal-modal-input')?.value.trim() || '';
       const screenTime = document.getElementById('edit-screen-time-input').value.trim();
       // Convert hours and minutes to total minutes
