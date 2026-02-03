@@ -253,6 +253,11 @@
             <option value="journal">Journal</option>
           </select>
         </div>
+        <div class="calendar-navigation">
+          <button id="calendar-prev-month" class="calendar-nav-btn" title="Previous month">‹</button>
+          <h3 id="calendar-month-year"></h3>
+          <button id="calendar-next-month" class="calendar-nav-btn" title="Next month">›</button>
+        </div>
         <div id="calendar-container" class="calendar-container"></div>
       </div>
       
@@ -511,6 +516,8 @@
     let lastKnownDate = null;
     let dateCheckInterval = null;
     let isCheckingDate = false; // Prevent recursive calls
+    let calendarViewMonth = null; // Current viewing month (0-11)
+    let calendarViewYear = null; // Current viewing year
 
     // Check if date has changed and update if needed
     async function checkDateChange() {
@@ -1721,15 +1728,6 @@
       const container = document.getElementById('history-list');
       const emptyState = document.getElementById('history-empty');
 
-      if (entries.length === 0) {
-        container.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-      }
-
-      emptyState.style.display = 'none';
-      const sortedEntries = entries.sort((a, b) => b.date.localeCompare(a.date));
-      
       // Load top habits (first 3 from ordered list)
       const habits = await getHabits();
       const prefs = await getPreferences();
@@ -1750,19 +1748,70 @@
       document.getElementById('history-habit-2').textContent = orderedHabits[1]?.name || '-';
       document.getElementById('history-habit-3').textContent = orderedHabits[2]?.name || '-';
 
-      container.innerHTML = sortedEntries.map(entry => {
-        const completions = entry.habitCompletions || {};
+      // Create a map of entries by date for quick lookup
+      const entriesMap = new Map();
+      entries.forEach(entry => {
+        entriesMap.set(entry.date, entry);
+      });
+
+      // Generate all dates from first entry (or 30 days ago) to today
+      const today = getTodayDate();
+      const todayDate = new Date(today + 'T00:00:00');
+      
+      let startDate;
+      if (entries.length > 0) {
+        const sortedEntries = entries.sort((a, b) => a.date.localeCompare(b.date));
+        const firstEntryDate = new Date(sortedEntries[0].date + 'T00:00:00');
+        // Show from first entry or 30 days ago, whichever is more recent
+        const thirtyDaysAgo = new Date(todayDate);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        startDate = firstEntryDate < thirtyDaysAgo ? thirtyDaysAgo : firstEntryDate;
+      } else {
+        // No entries, show last 30 days
+        startDate = new Date(todayDate);
+        startDate.setDate(startDate.getDate() - 30);
+      }
+
+      // Generate all dates from startDate to today
+      const allDates = [];
+      const currentDate = new Date(startDate);
+      while (currentDate <= todayDate) {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        allDates.push(dateStr);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Sort dates in descending order (most recent first)
+      allDates.sort((a, b) => b.localeCompare(a));
+
+      if (allDates.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      container.innerHTML = allDates.map(dateStr => {
+        const entry = entriesMap.get(dateStr);
+        const completions = entry?.habitCompletions || {};
         const habitBoxes = topHabits.map((habitId, index) => {
           if (!habitId) return '<div class="habit-box empty">-</div>';
           const completed = completions[habitId];
           return `<div class="habit-box ${completed ? 'completed' : ''}">${completed ? '✓' : ''}</div>`;
         }).join('');
 
+        // Show mood as "-/10" if not logged, otherwise show the value
+        const moodDisplay = entry?.mood ? `${entry.mood}/10` : '-/10';
+
         return `
-          <div class="history-row" data-date="${entry.date}">
-            <div class="history-date-col">${formatDateShort(entry.date)}</div>
+          <div class="history-row" data-date="${dateStr}">
+            <div class="history-date-col">${formatDateShort(dateStr)}</div>
             <div class="history-row-right">
-              <div class="history-mood-col">${entry.mood ? `${entry.mood}/10` : '-'}</div>
+              <div class="history-mood-col">${moodDisplay}</div>
               <div class="history-habits-col">${habitBoxes}</div>
             </div>
           </div>
@@ -2110,10 +2159,24 @@
         });
       }
       
-      // Get current month
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
+      // Initialize calendar view month/year if not set
+      if (calendarViewMonth === null || calendarViewYear === null) {
+        const now = new Date();
+        calendarViewYear = now.getFullYear();
+        calendarViewMonth = now.getMonth();
+      }
+      
+      // Get viewing month
+      const year = calendarViewYear;
+      const month = calendarViewMonth;
+      
+      // Update month/year display
+      const monthYearEl = document.getElementById('calendar-month-year');
+      if (monthYearEl) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+        monthYearEl.textContent = `${monthNames[month]} ${year}`;
+      }
       
       // Get first day of month and number of days
       const firstDay = new Date(year, month, 1);
@@ -2209,6 +2272,30 @@
           });
         }
       });
+      
+      // Add navigation button listeners
+      const prevBtn = document.getElementById('calendar-prev-month');
+      const nextBtn = document.getElementById('calendar-next-month');
+      if (prevBtn) {
+        prevBtn.onclick = () => {
+          calendarViewMonth--;
+          if (calendarViewMonth < 0) {
+            calendarViewMonth = 11;
+            calendarViewYear--;
+          }
+          loadCalendar();
+        };
+      }
+      if (nextBtn) {
+        nextBtn.onclick = () => {
+          calendarViewMonth++;
+          if (calendarViewMonth > 11) {
+            calendarViewMonth = 0;
+            calendarViewYear++;
+          }
+          loadCalendar();
+        };
+      }
     }
     
     // Utility
